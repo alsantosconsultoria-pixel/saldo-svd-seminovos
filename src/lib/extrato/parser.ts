@@ -102,7 +102,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string): Extrato {
       descricao = vizTk.filter((t) => t.x < 150).map((t) => t.text).join(" ");
     }
     const extraCp = vizTk.filter((t) => t.x >= 150 && t.x < 420).map((t) => t.text).join(" ");
-    if (extraCp && !/aviso|atualizado/i.test(extraCp)) contraparte = [contraparte, extraCp].filter(Boolean).join(" ");
+    if (!contraparte && extraCp && !/aviso|atualizado/i.test(extraCp)) contraparte = [contraparte, extraCp].filter(Boolean).join(" ");
 
     const up = descricao.toUpperCase();
     const ultimo = brl(valores[valores.length - 1].text);
@@ -181,6 +181,7 @@ export function categoria(desc: string): string {
   if (d.includes("BOLETO")) return "Boletos pagos";
   if (d.includes("CONS")) return "Consórcio";
   if (d.includes("SALARIO")) return "Folha";
+  if (d.startsWith("PAGAMENTO")) return "Pagamentos";
   if (d.includes("TRIBUTO") || d.includes("DARF")) return "Tributos";
   if (d.includes("TAR") || d.includes("JUROS") || d.includes("IOF")) return "Tarifas/Juros";
   if (d.includes("GIRO") || d.includes("EMPREST")) return "Empréstimos";
