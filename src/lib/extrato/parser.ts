@@ -98,13 +98,11 @@ export function parseLinhas(linhas: Linha[], arquivo: string): Extrato {
     let contraparte = textos.slice(1).map((t) => t.text).join(" ");
     const vizinhos = [linhas[i - 1], linhas[i + 1]].filter((l) => l && !isDataLinha(l));
     const vizTk = vizinhos.flatMap((l) => tokens(l!)).filter((t) => !RE_VALOR.test(t.text));
-    const descX = textos[0]?.x;
     if (!descricao || descricao.length < 3) {
       descricao = vizTk.filter((t) => t.x < 150).map((t) => t.text).join(" ");
     }
     const extraCp = vizTk.filter((t) => t.x >= 150 && t.x < 420).map((t) => t.text).join(" ");
     if (extraCp && !/aviso|atualizado/i.test(extraCp)) contraparte = [contraparte, extraCp].filter(Boolean).join(" ");
-    void descX;
 
     const up = descricao.toUpperCase();
     const ultimo = brl(valores[valores.length - 1].text);
@@ -163,15 +161,15 @@ export interface LinhaDiaria {
 
 export function saldoDiario(e: Extrato): LinhaDiaria[] {
   const dias = [...new Set(e.transacoes.map((t) => t.data).concat(e.saldosInformados.map((s) => s.data)))].sort();
-  let saldo = e.saldoInicial;
+  let saldo = Math.round(e.saldoInicial * 100);
   return dias.map((d) => {
     const t = e.transacoes.filter((x) => x.data === d);
     const entradas = t.filter((x) => x.tipo === "C").reduce((a, b) => a + b.valor, 0);
     const saidas = t.filter((x) => x.tipo === "D").reduce((a, b) => a + b.valor, 0);
-    const abertura = saldo;
-    saldo = Math.round((saldo + entradas - saidas) * 100) / 100;
+    const abertura = saldo / 100;
+    saldo = saldo + Math.round(entradas * 100) - Math.round(saidas * 100);
     const inf = e.saldosInformados.find((s) => s.data === d)?.saldo ?? null;
-    return { data: d, abertura, entradas, saidas, fechamento: saldo, informado: inf, ok: inf === null ? null : Math.abs(inf - saldo) < 0.01 };
+    return { data: d, abertura, entradas, saidas, fechamento: saldo / 100, informado: inf, ok: inf === null ? null : Math.round(inf * 100) === saldo };
   });
 }
 
