@@ -69,6 +69,7 @@ function Index() {
     return [...m.values()].sort((a, b) => b.saidas + b.entradas - (a.saidas + a.entradas));
   }, [transacoes]);
 
+  const futuros = ativos.flatMap((e) => (e.futuros ?? []).map((t) => ({ ...t, banco: e.banco })));
   const topSaidas = [...transacoes].filter((t) => t.tipo === "D").sort((a, b) => b.valor - a.valor).slice(0, 8);
 
   async function importar(files: FileList | null) {
@@ -76,16 +77,26 @@ function Index() {
     setCarregando(true);
     const { pdfParaLinhas } = await import("@/lib/extrato/pdf");
     for (const f of Array.from(files)) {
+      const id = toast.loading(`Lendo ${f.name}...`);
       try {
-        const linhas = await pdfParaLinhas(await f.arrayBuffer());
-        const e = parseLinhas(linhas, f.name);
-        if (!e.transacoes.length) {
-          toast.error(`${f.name}: nenhum lançamento encontrado (PDF escaneado ou layout desconhecido).`);
+        const { linhas, ocr } = await pdfParaLinhas(
+          await f.arrayBuffer(),
+          async (erro) => {
+            toast.dismiss(id);
+            return window.prompt(`${erro ? "Senha incorreta. " : ""}O arquivo ${f.name} tem senha. Digite a senha do PDF:`);
+          },
+          (msg) => toast.loading(msg, { id }),
+        );
+        const e = parseLinhas(linhas, f.name, ocr);
+        toast.dismiss(id);
+        if (!e.transacoes.length && !e.saldosInformados.length && !e.futuros?.length && !/lan[çc]amentos/i.test(linhas.flat().map((x) => x.text).join(" "))) {
+          toast.error(`${f.name}: nenhum lançamento ou saldo encontrado.`);
           continue;
         }
         add(e);
-        toast.success(`${e.banco}: ${e.transacoes.length} lançamentos importados`);
+        toast.success(`${e.banco}: ${e.transacoes.length} lançamentos${e.saldoFinalInformado !== null ? `, saldo ${fmt(e.saldoFinalInformado)}` : ""}${ocr ? " (lido por OCR — confira)" : ""}`);
       } catch (err) {
+        toast.dismiss(id);
         toast.error(`${f.name}: não foi possível ler o PDF`);
         console.error(err);
       }
@@ -217,6 +228,23 @@ function Index() {
                 </Table>
               </Card>
             </div>
+            {futuros.length > 0 && (
+              <Card className="p-5">
+                <h3 className="mb-3 font-semibold">Lançamentos futuros</h3>
+                <Table>
+                  <TableBody>
+                    {futuros.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="num text-xs text-muted-foreground">{fmtData(t.data)}</TableCell>
+                        <TableCell>{t.banco}</TableCell>
+                        <TableCell>{t.descricao}</TableCell>
+                        <TableCell className={`num text-right ${t.tipo === "C" ? "text-credit" : "text-debit"}`}>{t.tipo === "D" ? "-" : ""}{fmt(t.valor)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="diario" className="space-y-4">
@@ -232,6 +260,9 @@ function Index() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {saldoDiario(e).length === 0 && (
+                      <TableRow><TableCell colSpan={7} className="text-muted-foreground">Sem lançamentos nem saldo no período.</TableCell></TableRow>
+                    )}
                     {saldoDiario(e).map((d) => (
                       <TableRow key={d.data}>
                         <TableCell className="num">{fmtData(d.data)}</TableCell>
@@ -281,7 +312,7 @@ function Index() {
                   <div className="text-sm text-muted-foreground">{e.titular} · {e.arquivo} · {e.transacoes.length} lançamentos</div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="num font-semibold">{fmt(e.saldoFinalInformado ?? 0)}</span>
+                  <span className="num font-semibold">{e.saldoFinalInformado === null ? "sem saldo no extrato" : fmt(e.saldoFinalInformado)}</span>
                   <Button variant="ghost" size="icon" onClick={() => remove(e.id)} aria-label="Remover"><Trash2 /></Button>
                 </div>
               </Card>

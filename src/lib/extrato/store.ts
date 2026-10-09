@@ -2,15 +2,15 @@ import { useEffect, useState, useCallback } from "react";
 import type { Extrato } from "./parser";
 import seed from "./seed.json";
 
-const KEY = "extratos-v1";
-const demo = seed as Extrato;
+const KEY = "extratos-v2";
+const demo = seed as unknown as Extrato[];
 
 export function useExtratos() {
   const [lista, setLista] = useState<Extrato[]>([]);
   const [pronto, setPronto] = useState(false);
   useEffect(() => {
     const raw = localStorage.getItem(KEY);
-    setLista(raw ? JSON.parse(raw) : [demo]);
+    setLista(raw ? JSON.parse(raw) : demo);
     setPronto(true);
   }, []);
   useEffect(() => {
@@ -18,7 +18,7 @@ export function useExtratos() {
   }, [lista, pronto]);
   const add = useCallback((e: Extrato) => setLista((l) => [...l, e]), []);
   const remove = useCallback((id: string) => setLista((l) => l.filter((x) => x.id !== id)), []);
-  const reset = useCallback(() => setLista([demo]), []);
+  const reset = useCallback(() => setLista(demo), []);
   return { lista, add, remove, reset, pronto };
 }
 
