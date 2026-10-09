@@ -73,7 +73,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string): Extrato {
   const banco = detectarBanco(textoTotal);
   const ag = textoTotal.match(/Ag[eê]ncia:?\s*(\d+)/i)?.[1] ?? "";
   const ct = textoTotal.match(/Conta:?\s*([\d.-]+)/i)?.[1] ?? "";
-  const titular = (linhas[0]?.map((f) => f.text).join(" ") ?? "").split(/CNPJ|Ag[eê]ncia/i)[0].trim();
+  const titular = (linhas[0]?.map((f) => f.text).join(" ") ?? "").split(/CNPJ|Ag[eê]ncia/i)[0]!.trim();
 
   const tx: Transacao[] = [];
   const saldos: SaldoDia[] = [];
@@ -85,8 +85,8 @@ export function parseLinhas(linhas: Linha[], arquivo: string): Extrato {
 
   linhas.forEach((linha, i) => {
     const tk = tokens(linha);
-    if (!tk.length || !RE_DATA.test(tk[0].text)) return;
-    const data = iso(tk[0].text);
+    if (!tk.length || !RE_DATA.test(tk[0]!.text)) return;
+    const data = iso(tk[0]!.text);
     const resto = tk.slice(1);
     const valores = resto.filter((t) => RE_VALOR.test(t.text));
     const docs = resto.filter((t) => RE_DOC.test(t.text));
@@ -105,7 +105,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string): Extrato {
     if (!contraparte && extraCp && !/aviso|atualizado/i.test(extraCp)) contraparte = [contraparte, extraCp].filter(Boolean).join(" ");
 
     const up = descricao.toUpperCase();
-    const ultimo = brl(valores[valores.length - 1].text);
+    const ultimo = brl(valores[valores.length - 1]!.text);
     if (up.includes("SALDO ANTERIOR")) {
       saldoInicial = ultimo;
       dataSaldoInicial = data;
@@ -116,7 +116,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string): Extrato {
       saldoFinal = ultimo;
       return;
     }
-    const v = brl(valores[0].text);
+    const v = brl(valores[0]!.text);
     tx.push({
       id: `${data}-${i}-${Math.random().toString(36).slice(2, 7)}`,
       data,
