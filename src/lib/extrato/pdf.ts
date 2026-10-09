@@ -13,11 +13,11 @@ export async function pdfParaLinhas(data: ArrayBuffer): Promise<Linha[]> {
     const grupos: { y: number; frags: { x: number; text: string }[] }[] = [];
     for (const it of items as { str: string; transform: number[] }[]) {
       if (!it.str?.trim()) continue;
-      const x = it.transform[4];
-      const y = it.transform[5];
+      const x = it.transform[4]!;
+      const y = it.transform[5]!;
       let g = grupos.find((g) => Math.abs(g.y - y) < 3);
       if (!g) grupos.push((g = { y, frags: [] }));
-      g.frags.push({ x, text: it.str.trim() });
+      g!.frags.push({ x, text: it.str.trim() });
     }
     grupos
       .sort((a, b) => b.y - a.y)
