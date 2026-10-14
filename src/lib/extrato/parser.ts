@@ -216,7 +216,10 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
       if (saldoFinal !== null || !/SALDO (ATUAL|DISPON)/i.test(t)) return;
       const v = tokens(linhas[i]!).filter((x) => RE_VALOR.test(x.text));
       if (!v.length) return;
-      const d = t.match(/em (\d{2}\/\d{2}(?:\/\d{4})?)/i)?.[1] ?? textoTotal.match(/\d{2}\/\d{2}\/\d{4}/)?.[0];
+      const d =
+        t.match(/em (\d{2}\/\d{2}(?:\/\d{4})?)/i)?.[1] ??
+        textoTotal.match(/Saldo em (\d{2}\/\d{2}\/\d{4})/i)?.[1] ??
+        textoTotal.match(/\d{2}\/\d{2}\/\d{4}/)?.[0];
       saldoFinal = brl(v.at(-1)!.text);
       if (d) saldos.push({ data: iso(d), saldo: saldoFinal });
     });
