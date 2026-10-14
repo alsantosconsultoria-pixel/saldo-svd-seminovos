@@ -69,7 +69,9 @@ function Index() {
     return [...m.values()].sort((a, b) => b.saidas + b.entradas - (a.saidas + a.entradas));
   }, [transacoes]);
 
-  const futuros = ativos.flatMap((e) => (e.futuros ?? []).map((t) => ({ ...t, banco: e.banco })));
+  const hojeIso = new Date().toISOString().slice(0, 10);
+  // futuros só aparecem enquanto a data prevista ainda não chegou; débitos só contam quando saem no extrato
+  const futuros = ativos.flatMap((e) => (e.futuros ?? []).filter((t) => t.data > hojeIso).map((t) => ({ ...t, banco: e.banco })));
   const topSaidas = [...transacoes].filter((t) => t.tipo === "D").sort((a, b) => b.valor - a.valor).slice(0, 8);
 
   async function importar(files: FileList | null) {
