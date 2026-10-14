@@ -82,3 +82,8 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* Esconde o selo "Edit with Lovable" injetado na página publicada */
+#lovable-badge {
+  display: none !important;
+}
