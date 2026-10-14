@@ -41,9 +41,12 @@ export function mesclar(lista: Extrato[], novo: Extrato): Extrato[] {
   const usaNovo = iniNovo < iniAtual && txNovas.length + saldosNovos.length > 0;
   // futuros: mantém apenas os que ainda não aconteceram e não foram lançados
   const lancados = new Set(transacoes.map((t) => `${t.data}|${t.valor}|${t.tipo}`));
-  const futuros = [...(atual.futuros ?? []), ...(novo.futuros ?? [])].filter(
-    (f, i, arr) => !lancados.has(`${f.data}|${f.valor}|${f.tipo}`) && arr.findIndex((g) => g.data === f.data && g.valor === f.valor && g.descricao === f.descricao) === i,
-  );
+  // futuros: vale a previsão do extrato mais recente (substitui a anterior); remove os já lançados
+  const ref = (e: Extrato) =>
+    [...e.transacoes.map((t) => t.data), ...e.saldosInformados.map((s) => s.data)].sort().at(-1) ??
+    (e.futuros ?? []).map((t) => t.data).sort()[0] ?? "";
+  const base = ref(novo) >= ref(atual) ? (novo.futuros ?? []) : (atual.futuros ?? []);
+  const futuros = base.filter((f) => !lancados.has(`${f.data}|${f.valor}|${f.tipo}`));
   const ultimo = saldosInformados.at(-1);
   const m: Extrato = {
     ...atual,
