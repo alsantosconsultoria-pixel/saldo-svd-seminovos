@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import type { Extrato } from "./parser";
+import type { Extrato, Tipo } from "./parser";
 import seed from "./seed.json";
 
 const KEY = "extratos-v2";
@@ -91,7 +91,7 @@ export function deJSON(texto: string): Extrato[] {
       contraparte: String(t.contraparte ?? ""),
       documento: String(t.documento ?? ""),
       valor: Number(t.valor) || 0,
-      tipo: (t.tipo === "D" ? "D" : "C") as Tipo2,
+      tipo: (t.tipo === "D" ? "D" : "C") as Tipo,
     }));
     const saldoFinal = o.saldo_final_informado == null ? (saldosInformados.at(-1)?.saldo ?? null) : Number(o.saldo_final_informado);
     return {
@@ -110,7 +110,6 @@ export function deJSON(texto: string): Extrato[] {
     };
   });
 }
-type Tipo2 = "C" | "D";
 
 export function exportar(nome: string, conteudo: string, tipo: string) {
   const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
