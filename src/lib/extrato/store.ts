@@ -27,7 +27,16 @@ export const hoje = () => new Date().toISOString().slice(0, 10);
 
 // Junta extrato da mesma conta/agência: acrescenta só as datas que ainda não existem
 export function mesclar(lista: Extrato[], novo: Extrato): Extrato[] {
-  const idx = lista.findIndex((x) => (x.agencia || x.conta) && chave(x) === chave(novo));
+  let idx = lista.findIndex((x) => (x.agencia || x.conta) && chave(x) === chave(novo));
+  // extrato sem agência/conta legível (ex.: escaneado): junta à única conta do mesmo banco
+  const semConta = (e: Extrato) => !e.agencia && !e.conta;
+  if (idx < 0) {
+    const mesmos = lista.map((x, i) => [x, i] as const).filter(([x]) => x.banco === novo.banco);
+    if (mesmos.length === 1 && (semConta(novo) || semConta(mesmos[0]![0]))) idx = mesmos[0]![1];
+  }
+  if (idx >= 0 && semConta(lista[idx]!) && !semConta(novo)) {
+    lista = lista.map((x, i) => (i === idx ? { ...x, agencia: novo.agencia, conta: novo.conta } : x));
+  }
   if (idx < 0) return [...lista, novo];
   const atual = lista[idx]!;
   const dias = new Set([...atual.transacoes.map((t) => t.data), ...atual.saldosInformados.map((s) => s.data)]);
