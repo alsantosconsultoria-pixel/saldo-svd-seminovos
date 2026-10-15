@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
-import { exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
+import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -33,6 +33,7 @@ function Index() {
   const [filtro, setFiltro] = useState("todos");
   const [carregando, setCarregando] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const inputJSON = useRef<HTMLInputElement>(null);
 
   const ativos = filtro === "todos" ? lista : lista.filter((e) => e.id === filtro);
 
