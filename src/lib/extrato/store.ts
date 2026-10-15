@@ -74,6 +74,44 @@ export function mesclar(lista: Extrato[], novo: Extrato): Extrato[] {
 export const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 export const fmtData = (d: string) => d.split("-").reverse().join("/");
 
+// Reconstrói extratos a partir do JSON exportado pelo app (extratos.json)
+export function deJSON(texto: string): Extrato[] {
+  const arr = JSON.parse(texto) as unknown;
+  if (!Array.isArray(arr)) throw new Error("esperado array de contas");
+  return arr.map((bruto, i) => {
+    const o = bruto as Record<string, unknown>;
+    const diario = (Array.isArray(o.saldo_diario) ? o.saldo_diario : []) as Record<string, unknown>[];
+    const saldosInformados = diario
+      .filter((d) => typeof d.informado === "number")
+      .map((d) => ({ data: String(d.data), saldo: Number(d.informado) }));
+    const transacoes = ((Array.isArray(o.transacoes) ? o.transacoes : []) as Record<string, unknown>[]).map((t, j) => ({
+      id: `json-${i}-${j}`,
+      data: String(t.data ?? ""),
+      descricao: String(t.descricao ?? ""),
+      contraparte: String(t.contraparte ?? ""),
+      documento: String(t.documento ?? ""),
+      valor: Number(t.valor) || 0,
+      tipo: (t.tipo === "D" ? "D" : "C") as Tipo2,
+    }));
+    const saldoFinal = o.saldo_final_informado == null ? (saldosInformados.at(-1)?.saldo ?? null) : Number(o.saldo_final_informado);
+    return {
+      id: `json-${i}`,
+      banco: String(o.banco ?? "Banco"),
+      agencia: String(o.agencia ?? ""),
+      conta: String(o.conta ?? ""),
+      titular: String(o.titular ?? ""),
+      arquivo: "restaurado de JSON",
+      importadoEm: new Date().toISOString(),
+      saldoInicial: Number(o.saldo_inicial) || 0,
+      dataSaldoInicial: transacoes[0]?.data || saldosInformados[0]?.data || "",
+      saldoFinalInformado: saldoFinal,
+      saldosInformados,
+      transacoes,
+    };
+  });
+}
+type Tipo2 = "C" | "D";
+
 export function exportar(nome: string, conteudo: string, tipo: string) {
   const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
   const a = document.createElement("a");
