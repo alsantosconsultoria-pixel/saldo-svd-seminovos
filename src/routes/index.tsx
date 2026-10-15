@@ -108,6 +108,22 @@ function Index() {
     if (input.current) input.current.value = "";
   }
 
+  function restaurarJSON(files: FileList | null) {
+    const f = files?.[0];
+    if (!f) return;
+    f.text().then((txt) => {
+      try {
+        const contas = deJSON(txt);
+        if (!contas.length) { toast.error("O arquivo não tem contas."); return; }
+        contas.forEach(add);
+        toast.success(`${contas.length} ${contas.length === 1 ? "conta restaurada" : "contas restauradas"} do JSON. Já existentes não foram duplicadas.`);
+      } catch {
+        toast.error("JSON inválido — use o arquivo exportado pelo próprio app.");
+      }
+    });
+    if (inputJSON.current) inputJSON.current.value = "";
+  }
+
   function baixarCSV() {
     const h = "banco;conta;data;descricao;contraparte;documento;tipo;valor\n";
     const rows = transacoes.map((t) => [t.banco, t.conta, t.data, t.descricao, t.contraparte, t.documento, t.tipo, t.valor.toFixed(2).replace(".", ",")].join(";"));
@@ -152,6 +168,8 @@ function Index() {
             </SelectContent>
           </Select>
           <div className="flex gap-2 print:hidden">
+            <input ref={inputJSON} type="file" accept=".json,application/json" hidden onChange={(e) => restaurarJSON(e.target.files)} />
+            <Button variant="outline" size="sm" onClick={() => inputJSON.current?.click()}><Upload /> Restaurar JSON</Button>
             <Button variant="outline" size="sm" onClick={baixarCSV}><Download /> CSV</Button>
             <Button variant="outline" size="sm" onClick={baixarJSON}><Download /> JSON</Button>
           </div>
