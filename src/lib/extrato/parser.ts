@@ -112,8 +112,10 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
   const textoTotal = textoLinhas.join("\n");
   const banco = detectarBanco(textoTotal);
   const ano = textoTotal.match(/\d{2}\/\d{2}\/(\d{4})/)?.[1] ?? String(new Date().getFullYear());
-  const ag = textoTotal.match(/(?:Ag[eê]ncia|Cooperativa):?\s*(\d+)/i)?.[1] ?? "";
-  const ct = textoTotal.match(/Conta(?: Corrente)?:?\s*([\d.-]{4,})/i)?.[1] ?? "";
+  // layout com rótulos numa linha e valores na seguinte (ex.: Omni "Agência: Conta:" / "1 606000-9")
+  const empilhado = textoTotal.match(/Ag[eê]ncia:?\s+Conta:?\s*\n\s*(\d+)\s+([\d.-]{4,})/i);
+  const ag = empilhado?.[1] ?? textoTotal.match(/(?:Ag[eê]ncia|Cooperativa):?\s*(\d+)/i)?.[1] ?? "";
+  const ct = empilhado?.[2] ?? textoTotal.match(/Conta(?: Corrente)?:?\s*([\d.-]{4,})/i)?.[1] ?? "";
   const titular =
     textoLinhas.slice(0, 20).map((t) => t.match(/([A-Z][A-Z .&]+(?:LTDA|S\.A\.|EIRELI|ME|VEICUL\w*))/)?.[1]).find(Boolean)?.trim() ?? "";
 
