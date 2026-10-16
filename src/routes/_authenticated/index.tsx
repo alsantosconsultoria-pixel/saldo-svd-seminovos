@@ -1,18 +1,18 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer } from "lucide-react";
+import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Saldo Diário — Controle multi-bancos por extrato PDF" },
@@ -30,10 +30,16 @@ const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.cont
 
 function Index() {
   const { lista, add, remove, reset } = useExtratos();
+  const navigate = useNavigate();
   const [filtro, setFiltro] = useState("todos");
   const [carregando, setCarregando] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const inputJSON = useRef<HTMLInputElement>(null);
+
+  async function sair() {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
 
   const ativos = filtro === "todos" ? lista : lista.filter((e) => e.id === filtro);
 
@@ -141,7 +147,6 @@ function Index() {
 
   return (
     <div className="min-h-screen">
-      <Toaster />
       <header className="border-b bg-primary text-primary-foreground print:bg-transparent print:text-foreground">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-5">
           <div>
@@ -154,6 +159,7 @@ function Index() {
               <Upload /> {carregando ? "Lendo PDF..." : "Importar extrato PDF"}
             </Button>
             <Button variant="secondary" onClick={() => window.print()}><Printer /> Imprimir</Button>
+            <Button variant="secondary" onClick={sair}><LogOut /> Sair</Button>
           </div>
         </div>
       </header>
