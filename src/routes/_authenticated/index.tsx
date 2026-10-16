@@ -1,14 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer } from "lucide-react";
+import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 
