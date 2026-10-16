@@ -99,12 +99,10 @@ export function useExtratos() {
       setLista((l) => {
         const nova = mesclar(l, e);
         if (!aplicandoRemoto.current) {
-          const gravada = nova.find((x) => x.id === (nova.some((x) => x.id === e.id) ? e.id : nova.find((n) => !l.some((o) => o.id === n.id))?.id));
           // mesclar pode fundir em conta existente: grava a conta resultante
-          const alvo = nova.find((x) => !l.some((o) => o.id === x.id)) ?? nova.find((x) => x.id === e.id) ?? gravada;
+          const alvo = nova.find((x) => x.id === e.id) ?? nova.find((x) => !l.some((o) => o.id === x.id));
           const antes = l.find((x) => x.id === alvo?.id);
-          const depois = alvo;
-          if (depois && JSON.stringify(antes) !== JSON.stringify(depois)) void subir(depois);
+          if (alvo && JSON.stringify(antes) !== JSON.stringify(alvo)) void subir(alvo);
         }
         return nova;
       }),
