@@ -37,7 +37,7 @@ export function useExtratos() {
         console.error("Falha ao carregar extratos da nuvem", error);
         return;
       }
-      const naNuvem = (data ?? []).map((r) => r.dados as Extrato);
+      const naNuvem = (data ?? []).map((r) => r.dados as unknown as Extrato);
       remoto.current = true;
       if (naNuvem.length) {
         // mescla nuvem com o que só existe localmente (ex.: dados deste PC antes do login)
@@ -90,7 +90,7 @@ export function useExtratos() {
     if (!sessao.user) return;
     const { error } = await supabase
       .from("extratos")
-      .upsert({ id: e.id, user_id: sessao.user.id, dados: e, atualizado_em: new Date().toISOString() });
+      .upsert({ id: e.id, user_id: sessao.user.id, dados: JSON.parse(JSON.stringify(e)), atualizado_em: new Date().toISOString() });
     if (error) console.error("Falha ao sincronizar extrato", error);
   }, []);
 
