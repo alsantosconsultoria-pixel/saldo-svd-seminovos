@@ -1,24 +1,128 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { Extrato, Tipo } from "./parser";
 import seed from "./seed.json";
+import { supabase } from "@/integrations/supabase/client";
 
 const KEY = "extratos-v2";
 const demo = seed as unknown as Extrato[];
 
+// Extratos sincronizados na nuvem (Lovable Cloud): qualquer dispositivo com
+// login vê e altera os mesmos dados. localStorage fica só como cópia local
+// para abrir rápido e funcionar sem internet momentaneamente.
 export function useExtratos() {
   const [lista, setLista] = useState<Extrato[]>([]);
   const [pronto, setPronto] = useState(false);
+  const remoto = useRef(false); // já carregou da nuvem
+  const aplicandoRemoto = useRef(false); // evita eco: mudança vinda da nuvem não regrava
+
+  // carga inicial: cópia local imediata, depois a nuvem manda
   useEffect(() => {
     const raw = localStorage.getItem(KEY);
     setLista(raw ? JSON.parse(raw) : demo);
     setPronto(true);
   }, []);
+
+  // busca na nuvem e assina mudanças em tempo real (outros dispositivos)
+  useEffect(() => {
+    if (!pronto) return;
+    let canal: ReturnType<typeof supabase.channel> | null = null;
+    let ativo = true;
+
+    (async () => {
+      const { data: sessao } = await supabase.auth.getUser();
+      if (!sessao.user || !ativo) return;
+      const { data, error } = await supabase.from("extratos").select("id, dados");
+      if (!ativo) return;
+      if (error) {
+        console.error("Falha ao carregar extratos da nuvem", error);
+        return;
+      }
+      const naNuvem = (data ?? []).map((r) => r.dados as Extrato);
+      remoto.current = true;
+      if (naNuvem.length) {
+        // mescla nuvem com o que só existe localmente (ex.: dados deste PC antes do login)
+        setLista((local) => {
+          let merged = naNuvem;
+          local.forEach((e) => {
+            if (!naNuvem.some((n) => n.id === e.id)) merged = mesclar(merged, e);
+          });
+          return merged;
+        });
+      } else {
+        // nuvem vazia: sobe o que há localmente
+        setLista((local) => {
+          local.forEach((e) => void subir(e));
+          return local;
+        });
+      }
+      canal = supabase
+        .channel("extratos-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "extratos" }, (payload) => {
+          aplicandoRemoto.current = true;
+          if (payload.eventType === "DELETE") {
+            const id = (payload.old as { id?: string }).id;
+            if (id) setLista((l) => l.filter((x) => x.id !== id));
+          } else {
+            const e = (payload.new as { dados: Extrato }).dados;
+            setLista((l) => {
+              const sem = l.filter((x) => x.id !== e.id);
+              return [...sem, e];
+            });
+          }
+          setTimeout(() => (aplicandoRemoto.current = false), 0);
+        })
+        .subscribe();
+    })();
+
+    return () => {
+      ativo = false;
+      if (canal) supabase.removeChannel(canal);
+    };
+  }, [pronto]);
+
+  // grava cópia local sempre que a lista muda
   useEffect(() => {
     if (pronto) localStorage.setItem(KEY, JSON.stringify(lista));
   }, [lista, pronto]);
-  const add = useCallback((e: Extrato) => setLista((l) => mesclar(l, e)), []);
-  const remove = useCallback((id: string) => setLista((l) => l.filter((x) => x.id !== id)), []);
-  const reset = useCallback(() => setLista(demo), []);
+
+  const subir = useCallback(async (e: Extrato) => {
+    const { data: sessao } = await supabase.auth.getUser();
+    if (!sessao.user) return;
+    const { error } = await supabase
+      .from("extratos")
+      .upsert({ id: e.id, user_id: sessao.user.id, dados: e, atualizado_em: new Date().toISOString() });
+    if (error) console.error("Falha ao sincronizar extrato", error);
+  }, []);
+
+  const add = useCallback(
+    (e: Extrato) =>
+      setLista((l) => {
+        const nova = mesclar(l, e);
+        if (!aplicandoRemoto.current) {
+          const gravada = nova.find((x) => x.id === (nova.some((x) => x.id === e.id) ? e.id : nova.find((n) => !l.some((o) => o.id === n.id))?.id));
+          // mesclar pode fundir em conta existente: grava a conta resultante
+          const alvo = nova.find((x) => !l.some((o) => o.id === x.id)) ?? nova.find((x) => x.id === e.id) ?? gravada;
+          const antes = l.find((x) => x.id === alvo?.id);
+          const depois = alvo;
+          if (depois && JSON.stringify(antes) !== JSON.stringify(depois)) void subir(depois);
+        }
+        return nova;
+      }),
+    [subir],
+  );
+
+  const remove = useCallback((id: string) => {
+    setLista((l) => l.filter((x) => x.id !== id));
+    void supabase.from("extratos").delete().eq("id", id).then(({ error }) => {
+      if (error) console.error("Falha ao remover extrato da nuvem", error);
+    });
+  }, []);
+
+  const reset = useCallback(() => {
+    setLista(demo);
+    demo.forEach((e) => void subir(e));
+  }, [subir]);
+
   return { lista, add, remove, reset, pronto };
 }
 
