@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Saldo Diário — Controle multi-bancos por extrato PDF" },
