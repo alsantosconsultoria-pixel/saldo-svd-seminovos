@@ -30,10 +30,16 @@ const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.cont
 
 function Index() {
   const { lista, add, remove, reset } = useExtratos();
+  const navigate = useNavigate();
   const [filtro, setFiltro] = useState("todos");
   const [carregando, setCarregando] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const inputJSON = useRef<HTMLInputElement>(null);
+
+  async function sair() {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
 
   const ativos = filtro === "todos" ? lista : lista.filter((e) => e.id === filtro);
 
@@ -141,7 +147,6 @@ function Index() {
 
   return (
     <div className="min-h-screen">
-      <Toaster />
       <header className="border-b bg-primary text-primary-foreground print:bg-transparent print:text-foreground">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-5">
           <div>
@@ -154,6 +159,7 @@ function Index() {
               <Upload /> {carregando ? "Lendo PDF..." : "Importar extrato PDF"}
             </Button>
             <Button variant="secondary" onClick={() => window.print()}><Printer /> Imprimir</Button>
+            <Button variant="secondary" onClick={sair}><LogOut /> Sair</Button>
           </div>
         </div>
       </header>
