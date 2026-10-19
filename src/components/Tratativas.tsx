@@ -97,14 +97,12 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
                 <TableCell className="num text-right text-debit">{sai ? fmt(sai) : "—"}</TableCell>
                 <TableCell className={`num text-right font-semibold ${final < 0 ? "text-debit" : final === 0 ? "text-muted-foreground" : "text-credit"}`}>{fmt(final)}</TableCell>
                 <TableCell>
-                  {final <= 0 ? (
-                    <div className="flex items-center gap-2">
-                      <Input className="h-8 w-36" inputMode="decimal" placeholder={final < 0 ? fmt(-final) : "0,00"}
-                        value={digitado[e.id] ?? ""} onChange={(ev) => setDigitado((d) => ({ ...d, [e.id]: ev.target.value }))}
-                        onKeyDown={(ev) => ev.key === "Enter" && pedir(e)} />
-                      <Button size="sm" variant="outline" onClick={() => pedir(e)}><ArrowRightLeft /> Cobrir</Button>
-                    </div>
-                  ) : <span className="text-xs text-muted-foreground">—</span>}
+                  <div className="flex items-center gap-2">
+                    <Input className="h-8 w-36" inputMode="decimal" placeholder={final < 0 ? fmt(-final) : "0,00"}
+                      value={digitado[e.id] ?? ""} onChange={(ev) => setDigitado((d) => ({ ...d, [e.id]: ev.target.value }))}
+                      onKeyDown={(ev) => ev.key === "Enter" && pedir(e)} />
+                    <Button size="sm" variant="outline" onClick={() => pedir(e)}><ArrowRightLeft /> Cobrir</Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
