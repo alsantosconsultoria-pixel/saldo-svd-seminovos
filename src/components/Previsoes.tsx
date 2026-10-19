@@ -43,10 +43,10 @@ export function Previsoes() {
   }, []);
 
   async function importar(f: File | undefined) {
-    if (!f) return;
+    if (!f) return undefined;
     try {
       const wb = XLSX.read(await f.arrayBuffer(), { cellDates: true });
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]!]!);
       const { data: u } = await supabase.auth.getUser();
       const novos = rows.flatMap((r) => {
         const venc = data(pega(r, "vencimento", "data", "data prevista"));
@@ -62,7 +62,7 @@ export function Previsoes() {
           banco: String(pega(r, "banco", "conta")), categoria: String(pega(r, "categoria")),
         }];
       });
-      if (!novos.length) return toast.error("Nenhuma linha válida. Confira as colunas Vencimento e Valor.");
+      if (!novos.length) { toast.error("Nenhuma linha válida. Confira as colunas Vencimento e Valor."); return undefined; }
       const { error } = await supabase.from("previsoes").insert(novos);
       if (error) throw error;
       toast.success(`${novos.length} previsões importadas.`);

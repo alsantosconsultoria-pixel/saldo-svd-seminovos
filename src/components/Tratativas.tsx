@@ -49,7 +49,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
 
   function pedir(e: Extrato) {
     const v = parseValor(digitado[e.id] ?? "");
-    if (v <= 0) return toast.error("Informe um valor maior que zero.");
+    if (v <= 0) { toast.error("Informe um valor maior que zero."); return; }
     setOrigem("");
     setPedido({ destino: e, valor: v });
   }
@@ -60,7 +60,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
     const { error } = await supabase.from("transferencias").insert({
       user_id: u.user!.id, data: dia, origem, destino: pedido.destino.id, valor: pedido.valor,
     });
-    if (error) return toast.error("Não foi possível salvar a transferência.");
+    if (error) { toast.error("Não foi possível salvar a transferência."); return; }
     setDigitado((d) => ({ ...d, [pedido.destino.id]: "" }));
     setPedido(null);
     toast.success("Transferência registrada.");
