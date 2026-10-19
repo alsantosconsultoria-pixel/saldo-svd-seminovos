@@ -1,0 +1,10 @@
+DROP POLICY IF EXISTS "equipe remove" ON public.previsoes;
+CREATE POLICY "dono remove" ON public.previsoes FOR DELETE TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "equipe remove" ON public.transferencias;
+CREATE POLICY "dono remove" ON public.transferencias FOR DELETE TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "equipe atualiza" ON public.extratos;
+DROP POLICY IF EXISTS "equipe remove" ON public.extratos;
+DROP POLICY IF EXISTS "equipe insere" ON public.extratos;
+CREATE POLICY "dono insere" ON public.extratos FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "dono atualiza" ON public.extratos FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "dono remove" ON public.extratos FOR DELETE TO authenticated USING (auth.uid() = user_id);
