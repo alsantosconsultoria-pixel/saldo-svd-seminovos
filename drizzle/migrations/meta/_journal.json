@@ -8,6 +8,13 @@
       "when": 1792440553767,
       "tag": "0000_create_extratos_sync_table",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792440791032,
+      "tag": "0001_tratativas_previsoes",
+      "breakpoints": true
     }
   ]
 }

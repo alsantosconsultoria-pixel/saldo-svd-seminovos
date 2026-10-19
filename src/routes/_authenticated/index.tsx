@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
+import { Tratativas } from "@/components/Tratativas";
+import { Previsoes } from "@/components/Previsoes";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -194,7 +196,12 @@ function Index() {
             <TabsTrigger value="diario">Saldo diário</TabsTrigger>
             <TabsTrigger value="lanc">Lançamentos</TabsTrigger>
             <TabsTrigger value="contas">Contas</TabsTrigger>
+            <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>
+            <TabsTrigger value="previsoes">Previsões</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
+          <TabsContent value="previsoes"><Previsoes /></TabsContent>
 
           <TabsContent value="painel" className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">

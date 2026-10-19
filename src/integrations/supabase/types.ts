@@ -35,6 +35,78 @@ export type Database = {
         }
         Relationships: []
       }
+      previsoes: {
+        Row: {
+          arquivo: string
+          banco: string
+          categoria: string
+          contraparte: string
+          criado_em: string
+          descricao: string
+          id: string
+          tipo: string
+          user_id: string
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          arquivo?: string
+          banco?: string
+          categoria?: string
+          contraparte?: string
+          criado_em?: string
+          descricao?: string
+          id?: string
+          tipo: string
+          user_id: string
+          valor: number
+          vencimento: string
+        }
+        Update: {
+          arquivo?: string
+          banco?: string
+          categoria?: string
+          contraparte?: string
+          criado_em?: string
+          descricao?: string
+          id?: string
+          tipo?: string
+          user_id?: string
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: []
+      }
+      transferencias: {
+        Row: {
+          criado_em: string
+          data: string
+          destino: string
+          id: string
+          origem: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          criado_em?: string
+          data?: string
+          destino: string
+          id?: string
+          origem: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          criado_em?: string
+          data?: string
+          destino?: string
+          id?: string
+          origem?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
