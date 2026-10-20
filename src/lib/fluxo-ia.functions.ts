@@ -5,7 +5,7 @@ export const analisarFluxo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { resumo: string }) => ({ resumo: String(d.resumo).slice(0, 60000) }))
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = process.env["LOVABLE_API_KEY"];
     if (!key) return { erro: "IA não configurada.", texto: "" };
     const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",
