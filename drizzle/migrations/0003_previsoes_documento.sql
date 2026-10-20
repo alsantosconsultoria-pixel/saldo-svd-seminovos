@@ -1,0 +1,1 @@
+ALTER TABLE public.previsoes ADD COLUMN IF NOT EXISTS documento text NOT NULL DEFAULT '';

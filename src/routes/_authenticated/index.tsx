@@ -201,7 +201,7 @@ function Index() {
           </TabsList>
 
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
-          <TabsContent value="previsoes"><Previsoes /></TabsContent>
+          <TabsContent value="previsoes"><Previsoes lista={lista} /></TabsContent>
 
           <TabsContent value="painel" className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">

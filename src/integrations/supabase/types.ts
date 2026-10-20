@@ -43,6 +43,7 @@ export type Database = {
           contraparte: string
           criado_em: string
           descricao: string
+          documento: string
           id: string
           tipo: string
           user_id: string
@@ -56,6 +57,7 @@ export type Database = {
           contraparte?: string
           criado_em?: string
           descricao?: string
+          documento?: string
           id?: string
           tipo: string
           user_id: string
@@ -69,6 +71,7 @@ export type Database = {
           contraparte?: string
           criado_em?: string
           descricao?: string
+          documento?: string
           id?: string
           tipo?: string
           user_id?: string
