@@ -94,6 +94,8 @@
 .treasury-report th { white-space: normal; }
 .treasury-report tr { break-inside: avoid; }
 .treasury-report .report-approval { break-inside: avoid; }
+main:has(.treasury-presentation) > :not(:has(.treasury-presentation)) { display: none; }
+main:has(.treasury-workspace) [role="tablist"] { max-width: 100%; overflow-x: auto; justify-content: flex-start; }
 @media (max-width: 640px) {
   .treasury-report { padding: 20px 12px; }
   .treasury-report h2 { font-size: 24px; }
