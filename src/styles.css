@@ -87,3 +87,33 @@
 #lovable-badge {
   display: none !important;
 }
+
+.treasury-report-container { max-width: 1120px; margin-inline: auto; }
+.treasury-report { padding: 32px; border: 1px solid var(--border); }
+.treasury-report td { white-space: normal; overflow-wrap: anywhere; }
+.treasury-report th { white-space: normal; }
+.treasury-report tr { break-inside: avoid; }
+.treasury-report .report-approval { break-inside: avoid; }
+@media (max-width: 640px) {
+  .treasury-report { padding: 20px 12px; }
+  .treasury-report h2 { font-size: 24px; }
+}
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body:has(.treasury-workspace) header:not(.treasury-report header),
+  body:has(.treasury-workspace) main > :not(:has(.treasury-workspace)),
+  body:has(.treasury-workspace) [role="tablist"],
+  body:has(.treasury-workspace) .treasury-controls,
+  body:has(.treasury-workspace) .treasury-editor { display: none !important; }
+  body:has(.treasury-workspace) { background: var(--card); }
+  body:has(.treasury-workspace) main { max-width: none; margin: 0; padding: 0; }
+  .treasury-workspace, .treasury-report-container { display: block !important; margin: 0 !important; }
+  .treasury-report { padding: 0; border: 0; font-size: 10pt; }
+  .treasury-report [data-slot="table-container"], .treasury-report .overflow-auto { overflow: visible !important; }
+  .treasury-report table { width: 100%; table-layout: fixed; }
+  .treasury-report th, .treasury-report td { padding: 7px; font-size: 9pt; }
+  .treasury-report thead { display: table-header-group; }
+  .treasury-report section > div:first-child { break-after: avoid; }
+  .treasury-report { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .treasury-report .report-approval > div:last-child { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
