@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
 import { balancoNaData, despesasNaData, somarValores } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
+import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
 interface Transf { id: string; data: string; origem: string; destino: string; valor: number; user_id: string }
 export function saldoExtrato(e: Extrato) {
@@ -28,6 +29,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [relatorio, setRelatorio] = useState(false);
+  const relatorioRef = useRef<HTMLDivElement>(null);
   const [digitado, setDigitado] = useState<Record<string, string>>({});
   const [pedido, setPedido] = useState<{ destino: Extrato; valor: number } | null>(null);
   const [origem, setOrigem] = useState("");
@@ -121,6 +123,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
         <div className="flex flex-wrap gap-2">
           <Button variant={relatorio ? "secondary" : "outline"} onClick={() => setRelatorio((r) => !r)} disabled={carregando || erro}><FileText />{relatorio ? "Voltar às tratativas" : "Relatório para diretoria"}</Button>
           <Button onClick={() => window.print()} disabled={carregando || erro}><Printer /> Imprimir / PDF</Button>
+          {relatorio && <CompartilharRelatorio titulo={`Demonstrativo de tesouraria · ${fmtData(dia)}`} resumo={`Saldo após ajustes: ${fmt(total)}. Pagamentos propostos: ${fmt(pagamentos)}. Saldo projetado: ${fmt(total - pagamentos)}.`} arquivo={`tesouraria-${dia}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} disabled={carregando || erro} />}
         </div>
       </div>
       {carregando ? <p role="status" className="py-10 text-center text-muted-foreground">Carregando dados de {fmtData(dia)}…</p> : erro ? <p role="alert" className="border border-destructive/40 p-5 text-debit">Não foi possível carregar os dados desta data. Selecione a data novamente para tentar.</p> : <>
@@ -155,7 +158,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
             <p className="mt-3 text-xs text-muted-foreground">Previsões da planilha, sem baixa nos saldos. Vencimentos anteriores não estão incluídos.</p>
           </section>
         </div>
-        <div className={`treasury-report-container ${relatorio ? "" : "hidden"}`}><RelatorioTratativas dia={dia} linhas={linhas} despesas={despesas} transferencias={transf} total={total} pagamentos={pagamentos} /></div>
+        <div ref={relatorioRef} className={`treasury-report-container ${relatorio ? "" : "hidden"}`}><RelatorioTratativas dia={dia} linhas={linhas} despesas={despesas} transferencias={transf} total={total} pagamentos={pagamentos} /></div>
       </>}
       <Dialog open={!!pedido} onOpenChange={(o) => !o && !salvando && setPedido(null)}><DialogContent><DialogHeader><DialogTitle>De onde sairá o valor?</DialogTitle><DialogDescription>{pedido && <>Transferir <b>{fmt(pedido.valor)}</b> para <b>{nome(pedido.destino)}</b> em {fmtData(dia)}.</>}</DialogDescription></DialogHeader>
         <Select value={origem} onValueChange={setOrigem}><SelectTrigger><SelectValue placeholder="Escolha o banco de origem" /></SelectTrigger><SelectContent>{linhas.filter((l) => l.e.id !== pedido?.destino.id).map((l) => <SelectItem key={l.e.id} value={l.e.id}>{nome(l.e)} — {l.final === null ? "Saldo indisponível" : fmt(l.final)}</SelectItem>)}</SelectContent></Select>

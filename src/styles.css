@@ -95,6 +95,7 @@
 .treasury-report tr { break-inside: avoid; }
 .treasury-report .report-approval { break-inside: avoid; }
 main:has(.treasury-presentation) > :not(:has(.treasury-presentation)) { display: none; }
+main:has(.dashboard-presentation) > :not(:has(.dashboard-presentation)) { display: none; }
 main:has(.treasury-workspace) [role="tablist"] { max-width: 100%; overflow-x: auto; justify-content: flex-start; }
 @media (max-width: 640px) {
   .treasury-report { padding: 20px 12px; }
@@ -118,4 +119,12 @@ main:has(.treasury-workspace) [role="tablist"] { max-width: 100%; overflow-x: au
   .treasury-report section > div:first-child { break-after: avoid; }
   .treasury-report { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .treasury-report .report-approval > div:last-child { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body:has(.dashboard-presentation) > header,
+  body:has(.dashboard-presentation) header:not(.treasury-report header),
+  body:has(.dashboard-presentation) main > :not(:has(.dashboard-presentation)),
+  body:has(.dashboard-presentation) [role="tablist"],
+  body:has(.dashboard-presentation) .dashboard-controls,
+  body:has(.dashboard-presentation) .dashboard-editor { display: none !important; }
+  body:has(.dashboard-presentation) main { max-width: none; margin: 0; padding: 0; }
+  .dashboard-presentation { margin: 0 !important; }
 }
