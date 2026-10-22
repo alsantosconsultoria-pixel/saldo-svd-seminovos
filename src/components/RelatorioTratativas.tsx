@@ -26,7 +26,7 @@ export function RelatorioTratativas({ dia, linhas, despesas, transferencias, tot
     <article className="treasury-report bg-card text-card-foreground">
       <header className="flex flex-wrap items-start justify-between gap-5 border-b-2 border-primary pb-7">
         <div>
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary"><Landmark className="size-5" /> Santos Finance Consultoria</div>
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary"><Landmark className="size-5" /> Financeiro SVD SEMINOVOS</div>
           <h2 className="text-3xl font-semibold leading-tight">Demonstrativo de tesouraria</h2>
           <p className="mt-2 text-sm text-muted-foreground">Grupo SVD · Proposta de pagamentos e composição dos saldos</p>
         </div>
@@ -84,7 +84,7 @@ export function RelatorioTratativas({ dia, linhas, despesas, transferencias, tot
         <div className="mt-6 border-b pb-8 text-sm text-muted-foreground">Observações / ressalvas:</div>
         <div className="mt-12 grid gap-8 sm:grid-cols-3"><div className="border-t pt-2 text-xs">Responsável pela tesouraria</div><div className="border-t pt-2 text-xs">Diretoria · nome e assinatura</div><div className="border-t pt-2 text-xs">Data da aprovação</div></div>
       </section>
-      <footer className="mt-10 flex flex-wrap justify-between gap-2 border-t pt-4 text-xs text-muted-foreground"><span>Santos Finance Consultoria · Grupo SVD</span><span>Emitido em {emitido} · horário de Brasília</span></footer>
+      <footer className="mt-10 flex flex-wrap justify-between gap-2 border-t pt-4 text-xs text-muted-foreground"><span>Financeiro SVD SEMINOVOS · Grupo SVD</span><span>Emitido em {emitido} · horário de Brasília</span></footer>
     </article>
   );
 }

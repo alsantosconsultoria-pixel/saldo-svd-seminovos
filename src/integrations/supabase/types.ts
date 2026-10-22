@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      demonstrativos: {
+        Row: {
+          aprovado_por: string
+          conteudo: Json
+          criado_em: string
+          criador_email: string
+          data: string
+          decidido_em: string | null
+          decisao: string | null
+          id: string
+          ressalvas: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          aprovado_por?: string
+          conteudo: Json
+          criado_em?: string
+          criador_email?: string
+          data: string
+          decidido_em?: string | null
+          decisao?: string | null
+          id?: string
+          ressalvas?: string
+          token?: string
+          user_id: string
+        }
+        Update: {
+          aprovado_por?: string
+          conteudo?: Json
+          criado_em?: string
+          criador_email?: string
+          data?: string
+          decidido_em?: string | null
+          decisao?: string | null
+          id?: string
+          ressalvas?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       extratos: {
         Row: {
           atualizado_em: string
