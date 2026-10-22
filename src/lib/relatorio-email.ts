@@ -27,6 +27,6 @@ export function documentoRelatorio(element: HTMLElement, titulo: string) {
 }
 
 export function emailRelatorio(destinatario: string, titulo: string, resumo: string) {
-  const corpo = `Prezados,\n\nEncaminho o ${titulo} para apreciação.\n\n${resumo}\n\nO relatório completo segue em anexo ou abaixo.\n\nSantos Finance Consultoria · Grupo SVD`;
+  const corpo = `Prezados,\n\nEncaminho o ${titulo} para apreciação.\n\n${resumo}\n\nO relatório completo segue em anexo ou abaixo.\n\nFinanceiro SVD SEMINOVOS · Grupo SVD`;
   return `mailto:${encodeURIComponent(destinatario.trim())}?subject=${encodeURIComponent(titulo)}&body=${encodeURIComponent(corpo)}`;
 }

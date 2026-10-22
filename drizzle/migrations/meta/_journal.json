@@ -29,6 +29,13 @@
       "when": 1792494323716,
       "tag": "0003_previsoes_documento",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792669212311,
+      "tag": "0004_create_demonstrativos_aprovacao",
+      "breakpoints": true
     }
   ]
 }
