@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut } from "lucide-react";
+import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,8 @@ import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
+import { RelatorioPainel } from "@/components/RelatorioPainel";
+import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -37,6 +39,9 @@ function Index() {
   const [carregando, setCarregando] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const inputJSON = useRef<HTMLInputElement>(null);
+  const [relatorioPainel, setRelatorioPainel] = useState(false);
+  const [aba, setAba] = useState("painel");
+  const relatorioRef = useRef<HTMLDivElement>(null);
 
   async function sair() {
     await supabase.auth.signOut();
@@ -190,7 +195,7 @@ function Index() {
           <Kpi titulo="Saldo final" valor={saldoFim} destaque />
         </div>
 
-        <Tabs defaultValue="painel">
+        <Tabs value={aba} onValueChange={(valor) => { setAba(valor); setRelatorioPainel(false); }}>
           <TabsList className="print:hidden">
             <TabsTrigger value="painel">Painel</TabsTrigger>
             <TabsTrigger value="diario">Saldo diário</TabsTrigger>
@@ -203,7 +208,16 @@ function Index() {
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
           <TabsContent value="previsoes"><Previsoes lista={lista} /></TabsContent>
 
-          <TabsContent value="painel" className="space-y-4">
+          <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
+            <div className="dashboard-controls flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
+              <h2 className="text-xl font-semibold">Demonstração gerencial</h2>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setRelatorioPainel((v) => !v)}><FileText />{relatorioPainel ? "Voltar ao Painel" : "Relatório do Painel"}</Button>
+                {relatorioPainel && <><Button onClick={() => window.print()}><Printer /> Imprimir / PDF</Button><CompartilharRelatorio titulo="Demonstrativo gerencial de saldos · Grupo SVD" resumo={`Contas selecionadas: ${ativos.length}. Saldo inicial: ${fmt(saldoIni)}. Entradas: ${fmt(totE)}. Saídas: ${fmt(totS)}. Saldo final: ${fmt(saldoFim)}.`} arquivo={`painel-${hojeIso}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} /></>}
+              </div>
+            </div>
+            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} consolidado={consolidado} saldoIni={saldoIni} saldoFim={saldoFim} entradas={totE} saidas={totS} categorias={cats} maioresSaidas={topSaidas} /></div>}
+            <div className={`dashboard-editor space-y-4 ${relatorioPainel ? "hidden" : ""}`}>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
                 <h3 className="mb-3 font-semibold">Evolução do saldo consolidado</h3>
@@ -279,6 +293,7 @@ function Index() {
                 </Table>
               </Card>
             )}
+            </div>
           </TabsContent>
 
           <TabsContent value="diario" className="space-y-4">

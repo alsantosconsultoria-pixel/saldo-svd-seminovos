@@ -7,7 +7,7 @@ export function documentoRelatorio(element: HTMLElement, titulo: string) {
     const destino = copias[i];
     if (!destino) return;
     const estilo = getComputedStyle(origem);
-    for (const propriedade of Array.from(estilo)) {
+    for (const propriedade of ["display", "color", "background-color", "font-family", "font-size", "font-weight", "line-height", "text-align", "white-space", "overflow-wrap", "padding", "margin", "border", "border-top", "border-bottom", "border-left", "border-right", "border-collapse", "border-spacing", "width", "max-width", "height", "min-height", "box-sizing", "grid-template-columns", "gap", "flex-wrap", "align-items", "justify-content", "vertical-align", "fill", "stroke", "opacity"]) {
       destino.style.setProperty(propriedade, estilo.getPropertyValue(propriedade));
     }
     destino.removeAttribute("class");
