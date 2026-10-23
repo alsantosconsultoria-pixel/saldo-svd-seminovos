@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as DemonstrativoTokenRouteImport } from './routes/demonstrativo.$token'
 import { Route as ApiPublicDemonstrativoTokenRouteImport } from './routes/api/public/demonstrativo/$token'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -28,6 +29,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const DemonstrativoTokenRoute = DemonstrativoTokenRouteImport.update({
+  id: '/demonstrativo/$token',
+  path: '/demonstrativo/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicDemonstrativoTokenRoute =
   ApiPublicDemonstrativoTokenRouteImport.update({
     id: '/api/public/demonstrativo/$token',
@@ -38,10 +44,12 @@ const ApiPublicDemonstrativoTokenRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/demonstrativo/$token': typeof DemonstrativoTokenRoute
   '/api/public/demonstrativo/$token': typeof ApiPublicDemonstrativoTokenRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/demonstrativo/$token': typeof DemonstrativoTokenRoute
   '/': typeof AuthenticatedIndexRoute
   '/api/public/demonstrativo/$token': typeof ApiPublicDemonstrativoTokenRoute
 }
@@ -49,18 +57,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/demonstrativo/$token': typeof DemonstrativoTokenRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/public/demonstrativo/$token': typeof ApiPublicDemonstrativoTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/api/public/demonstrativo/$token'
+  fullPaths:
+    '/' | '/auth' | '/demonstrativo/$token' | '/api/public/demonstrativo/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/' | '/api/public/demonstrativo/$token'
+  to:
+    '/auth' | '/demonstrativo/$token' | '/' | '/api/public/demonstrativo/$token'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/demonstrativo/$token'
     | '/_authenticated/'
     | '/api/public/demonstrativo/$token'
   fileRoutesById: FileRoutesById
@@ -68,6 +80,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  DemonstrativoTokenRoute: typeof DemonstrativoTokenRoute
   ApiPublicDemonstrativoTokenRoute: typeof ApiPublicDemonstrativoTokenRoute
 }
 
@@ -94,6 +107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/demonstrativo/$token': {
+      id: '/demonstrativo/$token'
+      path: '/demonstrativo/$token'
+      fullPath: '/demonstrativo/$token'
+      preLoaderRoute: typeof DemonstrativoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/demonstrativo/$token': {
       id: '/api/public/demonstrativo/$token'
       path: '/api/public/demonstrativo/$token'
@@ -118,6 +138,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  DemonstrativoTokenRoute: DemonstrativoTokenRoute,
   ApiPublicDemonstrativoTokenRoute: ApiPublicDemonstrativoTokenRoute,
 }
 export const routeTree = rootRouteImport
