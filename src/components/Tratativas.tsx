@@ -116,7 +116,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
       user_id: u.user.id,
       criador_email: u.user.email ?? "",
       data: dia,
-      conteudo: { dia, linhas, despesas, transferencias: transf, total, pagamentos },
+      conteudo: JSON.parse(JSON.stringify({ dia, linhas, despesas, transferencias: transf, total, pagamentos })),
     }).select("token").single();
     setGerando(false);
     if (error || !data) { toast.error("Não foi possível gerar o link."); return; }
