@@ -143,7 +143,8 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
         <div className="flex flex-wrap gap-2">
           <Button variant={relatorio ? "secondary" : "outline"} onClick={() => setRelatorio((r) => !r)} disabled={carregando || erro}><FileText />{relatorio ? "Voltar às tratativas" : "Relatório para diretoria"}</Button>
           <Button onClick={() => window.print()} disabled={carregando || erro}><Printer /> Imprimir / PDF</Button>
-          {relatorio && <CompartilharRelatorio titulo={`Demonstrativo de tesouraria · ${fmtData(dia)}`} resumo={`Saldo após ajustes: ${fmt(total)}. Pagamentos propostos: ${fmt(pagamentos)}. Saldo projetado: ${fmt(total - pagamentos)}.`} arquivo={`tesouraria-${dia}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} disabled={carregando || erro} />}
+          {relatorio && <Button variant="outline" onClick={gerarLink} disabled={carregando || erro || gerando}><Link2 /> {gerando ? "Gerando…" : "Link para diretoria"}</Button>}
+          {relatorio && <CompartilharRelatorio titulo={`Demonstrativo de tesouraria · ${fmtData(dia)}`} resumo={`Saldo após ajustes: ${fmt(total)}. Pagamentos propostos: ${fmt(pagamentos)}. Saldo projetado: ${fmt(total - pagamentos)}.${link ? ` Aprovação on-line: ${link}` : ""}`} arquivo={`tesouraria-${dia}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} disabled={carregando || erro} />}
         </div>
       </div>
       {carregando ? <p role="status" className="py-10 text-center text-muted-foreground">Carregando dados de {fmtData(dia)}…</p> : erro ? <p role="alert" className="border border-destructive/40 p-5 text-debit">Não foi possível carregar os dados desta data. Selecione a data novamente para tentar.</p> : <>
