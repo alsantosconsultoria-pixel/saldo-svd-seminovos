@@ -107,6 +107,24 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
     if (error || !data?.length) { toast.error("Somente quem registrou pode desfazer este ajuste."); return; }
     setTransf((t) => t.filter((r) => r.id !== id)); toast.success("Ajuste desfeito.");
   }
+  async function gerarLink() {
+    if (gerando) return;
+    setGerando(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { toast.error("Entre novamente para gerar o link."); setGerando(false); return; }
+    const { data, error } = await supabase.from("demonstrativos").insert({
+      user_id: u.user.id,
+      criador_email: u.user.email ?? "",
+      data: dia,
+      conteudo: { dia, linhas, despesas, transferencias: transf, total, pagamentos },
+    }).select("token").single();
+    setGerando(false);
+    if (error || !data) { toast.error("Não foi possível gerar o link."); return; }
+    const url = `${window.location.origin}/demonstrativo/${data.token}`;
+    setLink(url);
+    try { await navigator.clipboard.writeText(url); } catch { /* cópia manual abaixo */ }
+    toast.success("Link gerado e copiado. Envie para a diretoria.");
+  }
 
   return (
     <div className={`treasury-workspace space-y-6 ${relatorio ? "treasury-presentation" : ""}`}>
