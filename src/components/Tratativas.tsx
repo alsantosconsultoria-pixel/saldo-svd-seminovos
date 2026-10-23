@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Printer, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,8 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [pedido, setPedido] = useState<{ destino: Extrato; valor: number } | null>(null);
   const [origem, setOrigem] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [link, setLink] = useState("");
+  const [gerando, setGerando] = useState(false);
 
   const carregar = useCallback(async () => {
     const [t, p] = await Promise.all([
