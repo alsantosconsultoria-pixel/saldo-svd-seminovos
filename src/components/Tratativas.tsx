@@ -147,6 +147,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
           {relatorio && <CompartilharRelatorio titulo={`Demonstrativo de tesouraria · ${fmtData(dia)}`} resumo={`Saldo após ajustes: ${fmt(total)}. Pagamentos propostos: ${fmt(pagamentos)}. Saldo projetado: ${fmt(total - pagamentos)}.${link ? ` Aprovação on-line: ${link}` : ""}`} arquivo={`tesouraria-${dia}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} disabled={carregando || erro} />}
         </div>
       </div>
+      {relatorio && link && <p className="treasury-controls flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm print:hidden"><Link2 className="size-4 shrink-0 text-primary" /><span className="font-medium">Link de aprovação:</span><a className="break-all underline" href={link} target="_blank" rel="noreferrer">{link}</a></p>}
       {carregando ? <p role="status" className="py-10 text-center text-muted-foreground">Carregando dados de {fmtData(dia)}…</p> : erro ? <p role="alert" className="border border-destructive/40 p-5 text-debit">Não foi possível carregar os dados desta data. Selecione a data novamente para tentar.</p> : <>
         <div className={`treasury-editor space-y-6 ${relatorio ? "hidden" : ""}`}>
           <div className="grid gap-5 border-b pb-6 sm:grid-cols-2 lg:grid-cols-4">
