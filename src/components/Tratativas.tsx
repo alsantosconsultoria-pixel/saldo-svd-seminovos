@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Printer, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,8 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [pedido, setPedido] = useState<{ destino: Extrato; valor: number } | null>(null);
   const [origem, setOrigem] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [link, setLink] = useState("");
+  const [gerando, setGerando] = useState(false);
 
   const carregar = useCallback(async () => {
     const [t, p] = await Promise.all([
@@ -105,6 +107,24 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
     if (error || !data?.length) { toast.error("Somente quem registrou pode desfazer este ajuste."); return; }
     setTransf((t) => t.filter((r) => r.id !== id)); toast.success("Ajuste desfeito.");
   }
+  async function gerarLink() {
+    if (gerando) return;
+    setGerando(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { toast.error("Entre novamente para gerar o link."); setGerando(false); return; }
+    const { data, error } = await supabase.from("demonstrativos").insert({
+      user_id: u.user.id,
+      criador_email: u.user.email ?? "",
+      data: dia,
+      conteudo: JSON.parse(JSON.stringify({ dia, linhas, despesas, transferencias: transf, total, pagamentos })),
+    }).select("token").single();
+    setGerando(false);
+    if (error || !data) { toast.error("Não foi possível gerar o link."); return; }
+    const url = `${window.location.origin}/demonstrativo/${data.token}`;
+    setLink(url);
+    try { await navigator.clipboard.writeText(url); } catch { /* cópia manual abaixo */ }
+    toast.success("Link gerado e copiado. Envie para a diretoria.");
+  }
 
   return (
     <div className={`treasury-workspace space-y-6 ${relatorio ? "treasury-presentation" : ""}`}>
@@ -123,9 +143,11 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
         <div className="flex flex-wrap gap-2">
           <Button variant={relatorio ? "secondary" : "outline"} onClick={() => setRelatorio((r) => !r)} disabled={carregando || erro}><FileText />{relatorio ? "Voltar às tratativas" : "Relatório para diretoria"}</Button>
           <Button onClick={() => window.print()} disabled={carregando || erro}><Printer /> Imprimir / PDF</Button>
-          {relatorio && <CompartilharRelatorio titulo={`Demonstrativo de tesouraria · ${fmtData(dia)}`} resumo={`Saldo após ajustes: ${fmt(total)}. Pagamentos propostos: ${fmt(pagamentos)}. Saldo projetado: ${fmt(total - pagamentos)}.`} arquivo={`tesouraria-${dia}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} disabled={carregando || erro} />}
+          {relatorio && <Button variant="outline" onClick={gerarLink} disabled={carregando || erro || gerando}><Link2 /> {gerando ? "Gerando…" : "Link para diretoria"}</Button>}
+          {relatorio && <CompartilharRelatorio titulo={`Demonstrativo de tesouraria · ${fmtData(dia)}`} resumo={`Saldo após ajustes: ${fmt(total)}. Pagamentos propostos: ${fmt(pagamentos)}. Saldo projetado: ${fmt(total - pagamentos)}.${link ? ` Aprovação on-line: ${link}` : ""}`} arquivo={`tesouraria-${dia}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} disabled={carregando || erro} />}
         </div>
       </div>
+      {relatorio && link && <p className="treasury-controls flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm print:hidden"><Link2 className="size-4 shrink-0 text-primary" /><span className="font-medium">Link de aprovação:</span><a className="break-all underline" href={link} target="_blank" rel="noreferrer">{link}</a></p>}
       {carregando ? <p role="status" className="py-10 text-center text-muted-foreground">Carregando dados de {fmtData(dia)}…</p> : erro ? <p role="alert" className="border border-destructive/40 p-5 text-debit">Não foi possível carregar os dados desta data. Selecione a data novamente para tentar.</p> : <>
         <div className={`treasury-editor space-y-6 ${relatorio ? "hidden" : ""}`}>
           <div className="grid gap-5 border-b pb-6 sm:grid-cols-2 lg:grid-cols-4">

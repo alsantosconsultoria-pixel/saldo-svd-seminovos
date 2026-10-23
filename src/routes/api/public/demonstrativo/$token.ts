@@ -57,7 +57,7 @@ export const Route = createFileRoute("/api/public/demonstrativo/$token")({
           .select("criador_email");
         if (error) return json({ erro: "falha_ao_salvar" }, 500);
         if (!salvo?.length) return json({ erro: "ja_decidido" }, 409);
-        return json({ ok: true, criador_email: salvo[0].criador_email });
+        return json({ ok: true, criador_email: salvo[0]?.criador_email ?? "" });
       },
     },
   },
