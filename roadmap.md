@@ -18,7 +18,8 @@
 # Painel e lançamentos
 - [x] Painel mostra o saldo do último dia de cada extrato, sem acumular dias.
 - [x] Totais de entradas/saídas só na aba Lançamentos, com filtro de data.
-- [ ] Conferir na tela o Painel e o filtro de data (aguarda sessão de teste).
+- [ ] Conferir na tela o Painel e o filtro de data (aguarda sessão de teste aprovada).
 
 # Contas vencidas no relatório
-- [ ] Trazar previsões "pagar" vencidas junto das despesas do dia, marcadas "não pago no vencimento".
+- [x] Títulos "pagar" vencidos entram junto das despesas do dia, marcados "não pago no vencimento" (tela e relatório da diretoria).
+- [ ] Conferir na tela a listagem de vencidos (aguarda sessão de teste aprovada).
