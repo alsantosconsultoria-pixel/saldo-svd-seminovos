@@ -39,7 +39,7 @@ export function RelatorioTratativas({ dia, linhas, despesas, transferencias, tot
 
       <section className="grid gap-5 border-b py-7 sm:grid-cols-3">
         <div><p className="text-xs font-medium text-muted-foreground">SALDO CONSOLIDADO APÓS AJUSTES</p><p className={`num mt-2 text-2xl font-semibold ${total < 0 ? "text-debit" : ""}`}>{fmt(total)}</p><p className="mt-1 text-xs text-muted-foreground">{linhas.length} contas · {incompleto ? "base parcial" : "base dos extratos"}</p></div>
-        <div><p className="text-xs font-medium text-muted-foreground">PAGAMENTOS PROPOSTOS</p><p className="num mt-2 text-2xl font-semibold">{fmt(pagamentos)}</p><p className="mt-1 text-xs text-muted-foreground">{despesas.length} títulos com vencimento na data</p></div>
+        <div><p className="text-xs font-medium text-muted-foreground">PAGAMENTOS PROPOSTOS</p><p className="num mt-2 text-2xl font-semibold">{fmt(pagamentos)}</p><p className="mt-1 text-xs text-muted-foreground">{despesas.length} títulos com vencimento até a data</p></div>
         <div><p className="text-xs font-medium text-muted-foreground">SALDO PROJETADO APÓS PAGAMENTOS</p><p className={`num mt-2 text-2xl font-semibold ${total - pagamentos < 0 ? "text-debit" : "text-credit"}`}>{fmt(total - pagamentos)}</p><p className="mt-1 text-xs text-muted-foreground">Projeção · sem baixa no saldo bancário</p></div>
       </section>
 
