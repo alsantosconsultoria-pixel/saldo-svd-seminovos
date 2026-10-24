@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
-import { balancoNaData, despesasNaData, somarValores } from "@/lib/tratativas";
+import { balancoNaData, despesasAteData, somarValores } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
@@ -40,7 +40,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const carregar = useCallback(async () => {
     const [t, p] = await Promise.all([
       supabase.from("transferencias").select("*").eq("data", dia).order("criado_em"),
-      supabase.from("previsoes").select("*").eq("tipo", "pagar").eq("vencimento", dia).order("contraparte"),
+      supabase.from("previsoes").select("*").eq("tipo", "pagar").lte("vencimento", dia).order("vencimento").order("contraparte"),
     ]);
     return { t, p };
   }, [dia]);
@@ -65,7 +65,8 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   }, [carregar, dia]);
 
   const linhas = useMemo(() => balancoNaData(lista, transf, dia), [lista, transf, dia]);
-  const despesas = useMemo(() => despesasNaData(itens, dia), [itens, dia]);
+  const despesas = useMemo(() => despesasAteData(itens, dia), [itens, dia]);
+  const vencidas = despesas.filter((d) => d.vencimento < dia).length;
   const total = somarValores(linhas.map((l) => l.final ?? 0));
   const pagamentos = somarValores(despesas.map((d) => d.valor));
   const ajustes = somarValores(transf.map((t) => t.valor));
@@ -152,7 +153,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
         <div className={`treasury-editor space-y-6 ${relatorio ? "hidden" : ""}`}>
           <div className="grid gap-5 border-b pb-6 sm:grid-cols-2 lg:grid-cols-4">
             <Resumo titulo={`Saldo após ajustes${incompleto ? " (parcial)" : ""}`} valor={total} detalhe={`${lista.length} contas bancárias`} />
-            <Resumo titulo="Despesas do dia" valor={pagamentos} detalhe={`${despesas.length} títulos a pagar`} />
+            <Resumo titulo="Despesas do dia" valor={pagamentos} detalhe={`${despesas.length} títulos a pagar${vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}`} />
             <Resumo titulo="Transferências internas" valor={ajustes} detalhe={`${transf.length} ajustes registrados`} />
             <Resumo titulo="Após pagamentos previstos" valor={total - pagamentos} detalhe="Projeção, sem baixa nos bancos" />
           </div>
