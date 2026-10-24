@@ -34,6 +34,13 @@ export function despesasNaData<T extends DespesaPrevista>(itens: T[], data: stri
   return itens.filter((i) => i.tipo === "pagar" && i.vencimento === data);
 }
 
+// Títulos vencidos entram junto das despesas do dia, marcados como não pagos no vencimento.
+export function despesasAteData<T extends DespesaPrevista>(itens: T[], data: string): T[] {
+  return itens
+    .filter((i) => i.tipo === "pagar" && i.vencimento <= data)
+    .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+}
+
 export function somarValores(valores: number[]) {
   return valores.reduce((a, v) => a + Math.round(v * 100), 0) / 100;
 }
