@@ -5,7 +5,8 @@ import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Print
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,8 @@ function Index() {
   const inputJSON = useRef<HTMLInputElement>(null);
   const [relatorioPainel, setRelatorioPainel] = useState(false);
   const [aba, setAba] = useState("painel");
+  const [lancDe, setLancDe] = useState("");
+  const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
 
   async function sair() {
@@ -67,10 +70,19 @@ function Index() {
   }, [ativos]);
 
   const transacoes = ativos.flatMap((e) => e.transacoes.map((t) => ({ ...t, banco: e.banco, conta: e.conta })));
+  // painel: saldo do último dia de cada extrato — nunca acumulado/somado entre dias
+  const saldoIni = ativos.reduce((a, e) => a + e.saldoInicial, 0);
+  const saldoFim = ativos.reduce((a, e) => a + (e.saldoFinalInformado ?? saldoDiario(e).at(-1)?.fechamento ?? e.saldoInicial), 0);
   const totE = transacoes.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const totS = transacoes.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
-  const saldoIni = ativos.reduce((a, e) => a + e.saldoInicial, 0);
-  const saldoFim = consolidado.at(-1)?.saldo ?? saldoIni;
+
+  // lançamentos: filtro por período + totais do período filtrado
+  const lancFiltrados = useMemo(
+    () => transacoes.filter((t) => (!lancDe || t.data >= lancDe) && (!lancAte || t.data <= lancAte)).sort((a, b) => a.data.localeCompare(b.data)),
+    [transacoes, lancDe, lancAte],
+  );
+  const lancE = lancFiltrados.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
+  const lancS = lancFiltrados.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
 
   const cats = useMemo(() => {
     const m = new Map<string, { cat: string; entradas: number; saidas: number }>();
