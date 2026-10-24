@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
-import { balancoNaData, despesasNaData, somarValores } from "@/lib/tratativas";
+import { balancoNaData, despesasAteData, somarValores } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
@@ -40,7 +40,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const carregar = useCallback(async () => {
     const [t, p] = await Promise.all([
       supabase.from("transferencias").select("*").eq("data", dia).order("criado_em"),
-      supabase.from("previsoes").select("*").eq("tipo", "pagar").eq("vencimento", dia).order("contraparte"),
+      supabase.from("previsoes").select("*").eq("tipo", "pagar").lte("vencimento", dia).order("vencimento").order("contraparte"),
     ]);
     return { t, p };
   }, [dia]);
@@ -65,7 +65,8 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   }, [carregar, dia]);
 
   const linhas = useMemo(() => balancoNaData(lista, transf, dia), [lista, transf, dia]);
-  const despesas = useMemo(() => despesasNaData(itens, dia), [itens, dia]);
+  const despesas = useMemo(() => despesasAteData(itens, dia), [itens, dia]);
+  const vencidas = despesas.filter((d) => d.vencimento < dia).length;
   const total = somarValores(linhas.map((l) => l.final ?? 0));
   const pagamentos = somarValores(despesas.map((d) => d.valor));
   const ajustes = somarValores(transf.map((t) => t.valor));
@@ -152,7 +153,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
         <div className={`treasury-editor space-y-6 ${relatorio ? "hidden" : ""}`}>
           <div className="grid gap-5 border-b pb-6 sm:grid-cols-2 lg:grid-cols-4">
             <Resumo titulo={`Saldo após ajustes${incompleto ? " (parcial)" : ""}`} valor={total} detalhe={`${lista.length} contas bancárias`} />
-            <Resumo titulo="Despesas do dia" valor={pagamentos} detalhe={`${despesas.length} títulos a pagar`} />
+            <Resumo titulo="Despesas do dia" valor={pagamentos} detalhe={`${despesas.length} títulos a pagar${vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}`} />
             <Resumo titulo="Transferências internas" valor={ajustes} detalhe={`${transf.length} ajustes registrados`} />
             <Resumo titulo="Após pagamentos previstos" valor={total - pagamentos} detalhe="Projeção, sem baixa nos bancos" />
           </div>
@@ -175,9 +176,9 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
             {transf.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma transferência registrada nesta data.</p> : <Table><TableHeader><TableRow><TableHead>Origem</TableHead><TableHead>Destino</TableHead><TableHead className="text-right">Valor</TableHead><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{transf.map((t) => <TableRow key={t.id}><TableCell>{porId(t.origem)}</TableCell><TableCell>{porId(t.destino)}</TableCell><TableCell className="num text-right font-semibold">{fmt(t.valor)}</TableCell><TableCell>{t.user_id === usuario && <Button variant="ghost" size="icon" aria-label="Desfazer" onClick={() => desfazer(t.id)}><Trash2 /></Button>}</TableCell></TableRow>)}</TableBody></Table>}
           </section>
           <section>
-            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-lg font-semibold">Despesas a pagar</h3><span className="text-sm text-muted-foreground">Vencimento: {fmtData(dia)}</span></div>
-            {despesas.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma despesa com vencimento nesta data.</p> : <Table><TableHeader><TableRow><TableHead>Fornecedor / despesa</TableHead><TableHead>Nº documento</TableHead><TableHead>Banco indicado</TableHead><TableHead className="text-right">Valor do título</TableHead></TableRow></TableHeader><TableBody>{despesas.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.descricao || d.categoria || "—"}</p></TableCell><TableCell>{d.documento || "—"}</TableCell><TableCell>{d.banco || "Não definido"}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell></TableRow>)}</TableBody></Table>}
-            <p className="mt-3 text-xs text-muted-foreground">Previsões da planilha, sem baixa nos saldos. Vencimentos anteriores não estão incluídos.</p>
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-lg font-semibold">Despesas a pagar</h3><span className="text-sm text-muted-foreground">Vencimento até {fmtData(dia)}{vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}</span></div>
+            {despesas.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma despesa com vencimento até esta data.</p> : <Table><TableHeader><TableRow><TableHead>Fornecedor / despesa</TableHead><TableHead>Vencimento</TableHead><TableHead>Nº documento</TableHead><TableHead>Banco indicado</TableHead><TableHead className="text-right">Valor do título</TableHead></TableRow></TableHeader><TableBody>{despesas.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.descricao || d.categoria || "—"}</p>{d.vencimento < dia && <p className="mt-1 inline-flex items-center gap-1 border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs font-medium text-debit">Não pago no vencimento</p>}</TableCell><TableCell className="num">{fmtData(d.vencimento)}</TableCell><TableCell>{d.documento || "—"}</TableCell><TableCell>{d.banco || "Não definido"}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell></TableRow>)}</TableBody></Table>}
+            <p className="mt-3 text-xs text-muted-foreground">Previsões da planilha, sem baixa nos saldos. Títulos vencidos permanecem na lista até serem pagos, marcados como "não pago no vencimento".</p>
           </section>
         </div>
         <div ref={relatorioRef} className={`treasury-report-container ${relatorio ? "" : "hidden"}`}><RelatorioTratativas dia={dia} linhas={linhas} despesas={despesas} transferencias={transf} total={total} pagamentos={pagamentos} /></div>
