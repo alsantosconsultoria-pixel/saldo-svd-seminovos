@@ -200,11 +200,9 @@ function Index() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Kpi titulo="Saldo inicial" valor={saldoIni} />
-          <Kpi titulo="Entradas" valor={totE} cor="text-credit" />
-          <Kpi titulo="Saídas" valor={-totS} cor="text-debit" />
-          <Kpi titulo="Saldo final" valor={saldoFim} destaque />
+          <Kpi titulo="Saldo final (último dia do extrato)" valor={saldoFim} destaque />
         </div>
 
         <Tabs value={aba} onValueChange={(valor) => { setAba(valor); setRelatorioPainel(false); }}>
@@ -225,7 +223,7 @@ function Index() {
               <h2 className="text-xl font-semibold">Demonstração gerencial</h2>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setRelatorioPainel((v) => !v)}><FileText />{relatorioPainel ? "Voltar ao Painel" : "Relatório do Painel"}</Button>
-                {relatorioPainel && <><Button onClick={() => window.print()}><Printer /> Imprimir / PDF</Button><CompartilharRelatorio titulo="Demonstrativo gerencial de saldos · Grupo SVD" resumo={`Contas selecionadas: ${ativos.length}. Saldo inicial: ${fmt(saldoIni)}. Entradas: ${fmt(totE)}. Saídas: ${fmt(totS)}. Saldo final: ${fmt(saldoFim)}.`} arquivo={`painel-${hojeIso}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} /></>}
+                {relatorioPainel && <><Button onClick={() => window.print()}><Printer /> Imprimir / PDF</Button><CompartilharRelatorio titulo="Demonstrativo gerencial de saldos · Grupo SVD" resumo={`Contas selecionadas: ${ativos.length}. Saldo inicial: ${fmt(saldoIni)}. Saldo final (último dia do extrato): ${fmt(saldoFim)}.`} arquivo={`painel-${hojeIso}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} /></>}
               </div>
             </div>
             {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} consolidado={consolidado} saldoIni={saldoIni} saldoFim={saldoFim} entradas={totE} saidas={totS} categorias={cats} maioresSaidas={topSaidas} /></div>}
@@ -347,10 +345,27 @@ function Index() {
 
           <TabsContent value="lanc">
             <Card className="p-5">
+              <div className="mb-4 flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground" htmlFor="lanc-de">De</label>
+                  <Input id="lanc-de" type="date" value={lancDe} onChange={(e) => setLancDe(e.target.value)} className="w-40" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground" htmlFor="lanc-ate">Até</label>
+                  <Input id="lanc-ate" type="date" value={lancAte} onChange={(e) => setLancAte(e.target.value)} className="w-40" />
+                </div>
+                {(lancDe || lancAte) && (
+                  <Button variant="ghost" size="sm" onClick={() => { setLancDe(""); setLancAte(""); }}>Limpar filtro</Button>
+                )}
+                <span className="ml-auto text-sm text-muted-foreground">{lancFiltrados.length} lançamentos</span>
+              </div>
               <Table>
                 <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Banco</TableHead><TableHead>Descrição</TableHead><TableHead>Contraparte</TableHead><TableHead>CNPJ/CPF</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {transacoes.map((t) => (
+                  {lancFiltrados.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="text-muted-foreground">Nenhum lançamento no período.</TableCell></TableRow>
+                  )}
+                  {lancFiltrados.map((t) => (
                     <TableRow key={t.id}>
                       <TableCell className="num">{fmtData(t.data)}</TableCell>
                       <TableCell>{t.banco}</TableCell>
@@ -361,6 +376,20 @@ function Index() {
                     </TableRow>
                   ))}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-right font-medium">Total de entradas</TableCell>
+                    <TableCell className="num text-right font-semibold text-credit">{fmt(lancE)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-right font-medium">Total de saídas</TableCell>
+                    <TableCell className="num text-right font-semibold text-debit">-{fmt(lancS)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-right font-medium">Resultado do período</TableCell>
+                    <TableCell className={`num text-right font-semibold ${lancE - lancS >= 0 ? "text-credit" : "text-debit"}`}>{fmt(lancE - lancS)}</TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
             </Card>
           </TabsContent>
