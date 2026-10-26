@@ -22,6 +22,8 @@ const nome = (e: Extrato) => `${e.banco} · Ag ${e.agencia || "—"} · CC ${e.c
 
 export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [dia, setDia] = useState(hoje);
+  const [incluirVencidas, setIncluirVencidas] = useState(true);
+  const [recarga, setRecarga] = useState(0);
   const [transf, setTransf] = useState<Transf[]>([]);
   const [itens, setItens] = useState<DespesaRelatorio[]>([]);
   const [usuario, setUsuario] = useState("");
@@ -39,21 +41,28 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const carregar = useCallback(async () => {
     const [t, p] = await Promise.all([
       supabase.from("transferencias").select("*").eq("data", dia).order("criado_em"),
-      supabase.from("previsoes").select("*").eq("tipo", "pagar").lte("vencimento", dia).order("vencimento").order("contraparte"),
+      (incluirVencidas
+        ? supabase.from("previsoes").select("*").eq("tipo", "pagar").lte("vencimento", dia)
+        : supabase.from("previsoes").select("*").eq("tipo", "pagar").eq("vencimento", dia)
+      ).order("vencimento").order("contraparte"),
     ]);
     return { t, p };
-  }, [dia]);
+  }, [dia, incluirVencidas]);
 
   useEffect(() => {
     let ativo = true;
     setCarregando(true); setErro(false); setTransf([]); setItens([]);
     async function atualizar() {
+      try {
       const { t, p } = await carregar();
       if (!ativo) return;
       if (t.error || p.error) { setErro(true); setCarregando(false); return; }
       setTransf((t.data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })));
       setItens((p.data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })));
       setErro(false); setCarregando(false);
+      } catch {
+        if (ativo) { setErro(true); setCarregando(false); }
+      }
     }
     void atualizar();
     void supabase.auth.getUser().then(({ data }) => { if (ativo) setUsuario(data.user?.id ?? ""); });
@@ -61,10 +70,10 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "transferencias" }, atualizar)
       .on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, atualizar).subscribe();
     return () => { ativo = false; void supabase.removeChannel(ch); };
-  }, [carregar, dia]);
+  }, [carregar, dia, recarga]);
 
   const linhas = useMemo(() => balancoNaData(lista, transf, dia), [lista, transf, dia]);
-  const despesas = useMemo(() => despesasAteData(itens, dia), [itens, dia]);
+  const despesas = useMemo(() => despesasAteData(itens, dia, incluirVencidas), [itens, dia, incluirVencidas]);
   const vencidas = despesas.filter((d) => d.vencimento < dia).length;
   const total = somarValores(linhas.map((l) => l.final ?? 0));
   const pagamentos = somarValores(despesas.map((d) => d.valor));
@@ -73,9 +82,10 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const origemSel = linhas.find((l) => l.e.id === origem);
   const porId = (id: string) => { const e = lista.find((c) => c.id === id); return e ? nome(e) : "Conta não disponível"; };
 
-  function mudarData(valor: string) {
+  function mudarData(valor: string, comVencidas = true) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return;
-    setDia(valor); setDigitado({}); setPedido(null); setCarregando(true);
+    setDia(valor); setIncluirVencidas(comVencidas); setRecarga((r) => r + 1);
+    setDigitado({}); setPedido(null); setLink(""); setCarregando(true);
   }
   function avancar(delta: number) {
     const data = new Date(`${dia}T12:00:00Z`);
@@ -137,7 +147,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
             <Button variant="outline" size="icon" aria-label="Dia anterior" onClick={() => avancar(-1)} disabled={salvando}><ChevronLeft /></Button>
             <Input id="data-tratativa" type="date" className="w-40 bg-card" value={dia} onChange={(e) => mudarData(e.target.value)} disabled={salvando} />
             <Button variant="outline" size="icon" aria-label="Próximo dia" onClick={() => avancar(1)} disabled={salvando}><ChevronRight /></Button>
-            <Button variant="ghost" size="sm" onClick={() => mudarData(hoje())} disabled={salvando}>Hoje</Button>
+            <Button variant="ghost" size="sm" onClick={() => mudarData(hoje(), false)} disabled={salvando}>Hoje</Button>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -175,12 +185,12 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
             {transf.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma transferência registrada nesta data.</p> : <Table><TableHeader><TableRow><TableHead>Origem</TableHead><TableHead>Destino</TableHead><TableHead className="text-right">Valor</TableHead><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{transf.map((t) => <TableRow key={t.id}><TableCell>{porId(t.origem)}</TableCell><TableCell>{porId(t.destino)}</TableCell><TableCell className="num text-right font-semibold">{fmt(t.valor)}</TableCell><TableCell>{t.user_id === usuario && <Button variant="ghost" size="icon" aria-label="Desfazer" onClick={() => desfazer(t.id)}><Trash2 /></Button>}</TableCell></TableRow>)}</TableBody></Table>}
           </section>
           <section>
-            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-lg font-semibold">Despesas a pagar</h3><span className="text-sm text-muted-foreground">Vencimento até {fmtData(dia)}{vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}</span></div>
-            {despesas.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma despesa com vencimento até esta data.</p> : <Table><TableHeader><TableRow><TableHead>Fornecedor / despesa</TableHead><TableHead>Vencimento</TableHead><TableHead>Nº documento</TableHead><TableHead>Banco indicado</TableHead><TableHead className="text-right">Valor do título</TableHead></TableRow></TableHeader><TableBody>{despesas.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.descricao || d.categoria || "—"}</p>{d.vencimento < dia && <p className="mt-1 inline-flex items-center gap-1 border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs font-medium text-debit">Não pago no vencimento</p>}</TableCell><TableCell className="num">{fmtData(d.vencimento)}</TableCell><TableCell>{d.documento || "—"}</TableCell><TableCell>{d.banco || "Não definido"}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell></TableRow>)}</TableBody></Table>}
-            <p className="mt-3 text-xs text-muted-foreground">Previsões da planilha, sem baixa nos saldos. Títulos vencidos permanecem na lista até serem pagos, marcados como "não pago no vencimento".</p>
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-lg font-semibold">Despesas a pagar</h3><span className="text-sm text-muted-foreground">Vencimento {incluirVencidas ? "até " : "em "}{fmtData(dia)}{vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}</span></div>
+            {despesas.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma despesa com vencimento {incluirVencidas ? "até esta" : "nesta"} data.</p> : <Table><TableHeader><TableRow><TableHead>Fornecedor / despesa</TableHead><TableHead>Vencimento</TableHead><TableHead>Nº documento</TableHead><TableHead>Banco indicado</TableHead><TableHead className="text-right">Valor do título</TableHead></TableRow></TableHeader><TableBody>{despesas.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.descricao || d.categoria || "—"}</p>{d.vencimento < dia && <p className="mt-1 inline-flex items-center gap-1 border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs font-medium text-debit">Não pago no vencimento</p>}</TableCell><TableCell className="num">{fmtData(d.vencimento)}</TableCell><TableCell>{d.documento || "—"}</TableCell><TableCell>{d.banco || "Não definido"}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell></TableRow>)}</TableBody></Table>}
+            <p className="mt-3 text-xs text-muted-foreground">Previsões da planilha, sem baixa nos saldos. {incluirVencidas ? 'Títulos vencidos permanecem na lista até serem pagos, marcados como "não pago no vencimento".' : "Somente títulos com vencimento hoje."}</p>
           </section>
         </div>
-        <div ref={relatorioRef} className={`treasury-report-container ${relatorio ? "" : "hidden"}`}><RelatorioTratativas dia={dia} linhas={linhas} despesas={despesas} transferencias={transf} total={total} pagamentos={pagamentos} /></div>
+        <div ref={relatorioRef} className={`treasury-report-container ${relatorio ? "" : "hidden"}`}><RelatorioTratativas dia={dia} linhas={linhas} despesas={despesas} transferencias={transf} total={total} pagamentos={pagamentos} incluirVencidas={incluirVencidas} /></div>
       </>}
       <Dialog open={!!pedido} onOpenChange={(o) => !o && !salvando && setPedido(null)}><DialogContent><DialogHeader><DialogTitle>De onde sairá o valor?</DialogTitle><DialogDescription>{pedido && <>Transferir <b>{fmt(pedido.valor)}</b> para <b>{nome(pedido.destino)}</b> em {fmtData(dia)}.</>}</DialogDescription></DialogHeader>
         <Select value={origem} onValueChange={setOrigem}><SelectTrigger><SelectValue placeholder="Escolha o banco de origem" /></SelectTrigger><SelectContent>{linhas.filter((l) => l.e.id !== pedido?.destino.id).map((l) => <SelectItem key={l.e.id} value={l.e.id}>{nome(l.e)} — {l.final === null ? "Saldo indisponível" : fmt(l.final)}</SelectItem>)}</SelectContent></Select>

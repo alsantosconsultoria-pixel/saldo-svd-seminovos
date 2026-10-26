@@ -4,6 +4,7 @@
 - [ ] Conferir saldo parcial na tela com conta conectada (aguarda usuário entrar na prévia; acesso automático indisponível).
 
 # Tratativas por data
+- [x] Corrigir recarga do botão Hoje e excluir vencidos anteriores nesse modo, com teste e conferência na tela (53 despesas de hoje; recarga repetida validada).
 - [x] Selecionar data e consultar saldos, despesas e ajustes correspondentes.
 - [x] Apresentar relatório executivo com impressão e espaço para aprovação.
 - [x] Testar cálculos e conferir o fluxo conectado na tela.
@@ -27,4 +28,4 @@
 
 # Contas vencidas no relatório
 - [x] Títulos "pagar" vencidos entram junto das despesas do dia, marcados "não pago no vencimento" (tela e relatório da diretoria).
-- [ ] Conferir na tela a listagem de vencidos (aguarda sessão de teste aprovada).
+- [x] Conferir na tela a listagem de vencidos na seleção manual de data; botão Hoje exclui vencidos anteriores.
