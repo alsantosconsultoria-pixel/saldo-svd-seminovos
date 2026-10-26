@@ -4,6 +4,7 @@
 - [ ] Conferir saldo parcial na tela com conta conectada (aguarda usuário entrar na prévia; acesso automático indisponível).
 
 # Tratativas por data
+- [ ] Corrigir recarga do botão Hoje e excluir vencidos anteriores nesse modo, com teste e conferência na tela.
 - [x] Selecionar data e consultar saldos, despesas e ajustes correspondentes.
 - [x] Apresentar relatório executivo com impressão e espaço para aprovação.
 - [x] Testar cálculos e conferir o fluxo conectado na tela.
