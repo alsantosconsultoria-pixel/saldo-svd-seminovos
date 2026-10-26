@@ -1,4 +1,9 @@
 # Tratativas por data
+# Saldo parcial de extratos
+- [ ] Calcular o último saldo pelas movimentações quando faltar fechamento informado e identificar como parcial.
+- [ ] Testar saldo sem fechamento e continuidade após o último saldo conhecido.
+
+# Tratativas por data
 - [x] Selecionar data e consultar saldos, despesas e ajustes correspondentes.
 - [x] Apresentar relatório executivo com impressão e espaço para aprovação.
 - [x] Testar cálculos e conferir o fluxo conectado na tela.
