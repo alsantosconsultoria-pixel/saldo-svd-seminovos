@@ -16,6 +16,7 @@ import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
+import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -61,7 +62,7 @@ function Index() {
       porConta.forEach(({ e, dias }) => {
         const hoje = dias.find((d) => d.data === data);
         const ult = [...dias].reverse().find((d) => d.data <= data);
-        saldo += ult ? ult.fechamento : e.saldoInicial;
+        saldo += saldoNaData(e, data)?.saldo ?? (ult ? ult.fechamento : e.saldoInicial);
         entradas += hoje?.entradas ?? 0;
         saidas += hoje?.saidas ?? 0;
       });
@@ -72,7 +73,9 @@ function Index() {
   const transacoes = ativos.flatMap((e) => e.transacoes.map((t) => ({ ...t, banco: e.banco, conta: e.conta })));
   // painel: saldo do último dia de cada extrato — nunca acumulado/somado entre dias
   const saldoIni = ativos.reduce((a, e) => a + e.saldoInicial, 0);
-  const saldoFim = ativos.reduce((a, e) => a + (e.saldoFinalInformado ?? saldoDiario(e).at(-1)?.fechamento ?? e.saldoInicial), 0);
+  const saldosAtuais = ativos.map(ultimoSaldoExtrato);
+  const saldoFim = saldosAtuais.reduce((a, s) => a + s.saldo, 0);
+  const saldoParcial = saldosAtuais.some((s) => s.parcial);
   const totE = transacoes.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const totS = transacoes.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
 
@@ -122,7 +125,8 @@ function Index() {
           continue;
         }
         add(e);
-        toast.success(`${e.banco}: ${e.transacoes.length} lançamentos${e.saldoFinalInformado !== null ? `, saldo ${fmt(e.saldoFinalInformado)}` : ""}${ocr ? " (lido por OCR — confira)" : ""}`);
+        const ultimoSaldo = ultimoSaldoExtrato(e);
+        toast.success(`${e.banco}: ${e.transacoes.length} lançamentos, saldo ${ultimoSaldo.parcial ? "parcial calculado" : "informado"} ${fmt(ultimoSaldo.saldo)}${ocr ? " (lido por OCR — confira)" : ""}`);
       } catch (err) {
         toast.dismiss(id);
         toast.error(`${f.name}: não foi possível ler o PDF`);
@@ -202,7 +206,7 @@ function Index() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Kpi titulo="Saldo inicial" valor={saldoIni} />
-          <Kpi titulo="Saldo final (último dia do extrato)" valor={saldoFim} destaque />
+          <Kpi titulo={saldoParcial ? "Saldo do último dia (inclui saldo parcial calculado)" : "Saldo final (último dia do extrato)"} valor={saldoFim} destaque />
         </div>
 
         <Tabs value={aba} onValueChange={(valor) => { setAba(valor); setRelatorioPainel(false); }}>
@@ -331,7 +335,7 @@ function Index() {
                         <TableCell className="num text-right font-semibold">{fmt(d.fechamento)}</TableCell>
                         <TableCell className="num text-right">{d.informado === null ? "—" : fmt(d.informado)}</TableCell>
                         <TableCell>
-                          {d.ok === null ? <span className="text-xs text-muted-foreground">sem saldo no PDF</span>
+                          {d.ok === null ? <span className="text-xs text-muted-foreground">Saldo parcial calculado</span>
                             : d.ok ? <span className="inline-flex items-center gap-1 text-sm text-credit"><CheckCircle2 className="size-4" /> OK</span>
                             : <span className="inline-flex items-center gap-1 text-sm text-debit"><AlertTriangle className="size-4" /> Dif. {fmt((d.informado ?? 0) - d.fechamento)}</span>}
                         </TableCell>
@@ -402,7 +406,7 @@ function Index() {
                   <div className="text-sm text-muted-foreground">{e.titular} · {e.arquivo} · {e.transacoes.length} lançamentos</div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="num font-semibold">{e.saldoFinalInformado === null ? "sem saldo no extrato" : fmt(e.saldoFinalInformado)}</span>
+                  <div className="text-right"><span className="num font-semibold">{fmt(ultimoSaldoExtrato(e).saldo)}</span><p className="text-xs text-muted-foreground">{ultimoSaldoExtrato(e).data && fmtData(ultimoSaldoExtrato(e).data)} · {ultimoSaldoExtrato(e).parcial ? "Saldo parcial calculado" : "Saldo informado"}</p></div>
                   <Button variant="ghost" size="icon" onClick={() => remove(e.id)} aria-label="Remover"><Trash2 /></Button>
                 </div>
               </Card>

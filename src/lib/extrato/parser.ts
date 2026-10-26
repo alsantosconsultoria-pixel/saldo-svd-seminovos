@@ -231,7 +231,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
   if (saldoInicial === null) {
     const primeiro = saldos[0];
     if (primeiro) {
-      const mov = tx.filter((t) => t.data === primeiro.data).reduce((a, t) => a + (t.tipo === "C" ? t.valor : -t.valor), 0);
+      const mov = tx.filter((t) => t.data <= primeiro.data).reduce((a, t) => a + (t.tipo === "C" ? t.valor : -t.valor), 0);
       saldoInicial = tx.length ? Math.round((primeiro.saldo - mov) * 100) / 100 : primeiro.saldo;
     } else saldoInicial = 0;
   }
@@ -277,7 +277,11 @@ export function saldoDiario(e: Extrato): LinhaDiaria[] {
     const abertura = saldo / 100;
     saldo = saldo + Math.round(entradas * 100) - Math.round(saidas * 100);
     const inf = e.saldosInformados.find((s) => s.data === d)?.saldo ?? null;
-    return { data: d, abertura, entradas, saidas, fechamento: saldo / 100, informado: inf, ok: inf === null ? null : Math.round(inf * 100) === saldo };
+    const fechamento = saldo / 100;
+    const ok = inf === null ? null : Math.round(inf * 100) === saldo;
+    // A conferência continua mostrando divergências; o próximo dia parte do saldo do banco.
+    if (inf !== null) saldo = Math.round(inf * 100);
+    return { data: d, abertura, entradas, saidas, fechamento, informado: inf, ok };
   });
 }
 

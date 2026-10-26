@@ -7,16 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { saldoDiario, type Extrato } from "@/lib/extrato/parser";
+import { type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
-import { balancoNaData, despesasAteData, somarValores } from "@/lib/tratativas";
+import { balancoNaData, despesasAteData, somarValores, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
 interface Transf { id: string; data: string; origem: string; destino: string; valor: number; user_id: string }
 export function saldoExtrato(e: Extrato) {
-  if (e.saldoFinalInformado !== null) return e.saldoFinalInformado;
-  return saldoDiario(e).at(-1)?.fechamento ?? e.saldoInicial;
+  return ultimoSaldoExtrato(e).saldo;
 }
 const parseValor = (s: string) => Number(s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")) || 0;
 const nome = (e: Extrato) => `${e.banco} · Ag ${e.agencia || "—"} · CC ${e.conta || "—"}`;

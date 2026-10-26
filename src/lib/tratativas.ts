@@ -44,3 +44,12 @@ export function despesasAteData<T extends DespesaPrevista>(itens: T[], data: str
 export function somarValores(valores: number[]) {
   return valores.reduce((a, v) => a + Math.round(v * 100), 0) / 100;
 }
+
+// Saldo da última data realizada: um saldo informado antigo não congela a conta.
+// Previsões nunca entram neste cálculo e o saldo calculado não vira saldo informado.
+export function ultimoSaldoExtrato(e: Extrato) {
+  const data = [...e.transacoes.map((t) => t.data), ...e.saldosInformados.map((s) => s.data), e.dataSaldoInicial].filter(Boolean).sort().at(-1) ?? "";
+  const conhecido = data ? saldoNaData(e, data) : null;
+  const informado = e.saldosInformados.some((s) => s.data === data);
+  return { saldo: conhecido?.saldo ?? e.saldoInicial, data, parcial: !informado };
+}

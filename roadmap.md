@@ -1,3 +1,8 @@
+# Saldo parcial de extratos
+- [x] Calcular o último saldo pelas movimentações quando faltar fechamento informado e identificar como parcial.
+- [x] Testar saldo sem fechamento e continuidade após o último saldo conhecido.
+- [ ] Conferir saldo parcial na tela com conta conectada (aguarda usuário entrar na prévia; acesso automático indisponível).
+
 # Tratativas por data
 - [x] Selecionar data e consultar saldos, despesas e ajustes correspondentes.
 - [x] Apresentar relatório executivo com impressão e espaço para aprovação.
