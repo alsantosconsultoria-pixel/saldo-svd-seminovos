@@ -1,26 +1,27 @@
 import { describe, expect, it } from "vitest";
-import type { Extrato } from "./extrato/parser";
+import type { Extrato, Transacao } from "./extrato/parser";
 import { balancoNaData, despesasAteData, despesasNaData, saldoNaData, ultimoSaldoExtrato } from "./tratativas";
 
 const conta: Extrato = { id: "itau", banco: "Itaú", agencia: "1", conta: "123", titular: "SVD", arquivo: "extrato.pdf", importadoEm: "", saldoInicial: 100, dataSaldoInicial: "2026-10-19", saldoFinalInformado: 900, saldosInformados: [{ data: "2026-10-19", saldo: 150 }, { data: "2026-10-21", saldo: 900 }], transacoes: [{ id: "1", data: "2026-10-20", tipo: "D", valor: 25.15, descricao: "Despesa", contraparte: "", documento: "" }] };
+const movimento: Transacao = { id: "1", data: "2026-10-20", tipo: "D", valor: 25.15, descricao: "Despesa", contraparte: "", documento: "" };
 
 describe("Tratativas por data", () => {
   it("calcula saldo parcial a partir do inicial, das entradas e das saídas realizadas", () => {
     const parcial: Extrato = { ...conta, saldoInicial: 1000, saldoFinalInformado: null, saldosInformados: [], transacoes: [
-      { ...conta.transacoes[0], id: "c", data: "2026-10-26", tipo: "C", valor: 250.50 },
-      { ...conta.transacoes[0], id: "d", data: "2026-10-26", tipo: "D", valor: 125.25 },
-    ], futuros: [{ ...conta.transacoes[0], data: "2026-10-27", tipo: "D", valor: 900 }] };
+      { ...movimento, id: "c", data: "2026-10-26", tipo: "C", valor: 250.50 },
+      { ...movimento, id: "d", data: "2026-10-26", tipo: "D", valor: 125.25 },
+    ], futuros: [{ ...movimento, data: "2026-10-27", tipo: "D", valor: 900 }] };
     expect(ultimoSaldoExtrato(parcial)).toEqual({ saldo: 1125.25, data: "2026-10-26", parcial: true });
   });
   it("não congela no saldo informado antigo quando há movimentações posteriores sem fechamento", () => {
     const parcial: Extrato = { ...conta, saldoFinalInformado: 900, transacoes: [
-      ...conta.transacoes, { ...conta.transacoes[0], data: "2026-10-26", valor: 125.25 },
+      ...conta.transacoes, { ...movimento, data: "2026-10-26", valor: 125.25 },
     ] };
     expect(ultimoSaldoExtrato(parcial)).toEqual({ saldo: 774.75, data: "2026-10-26", parcial: true });
     expect(saldoNaData(parcial, "2026-10-20")?.saldo).toBe(124.85);
   });
   it("prioriza fechamento informado na última data sem somar novamente as movimentações desse dia", () => {
-    const fechado: Extrato = { ...conta, saldosInformados: [...conta.saldosInformados, { data: "2026-10-26", saldo: 800 }], transacoes: [{ ...conta.transacoes[0], data: "2026-10-26", valor: 100 }] };
+    const fechado: Extrato = { ...conta, saldosInformados: [...conta.saldosInformados, { data: "2026-10-26", saldo: 800 }], transacoes: [{ ...movimento, data: "2026-10-26", valor: 100 }] };
     expect(ultimoSaldoExtrato(fechado)).toEqual({ saldo: 800, data: "2026-10-26", parcial: false });
   });
   it("sem base informada calcula apenas o resultado parcial das movimentações", () => {
