@@ -1,7 +1,8 @@
 import { Landmark } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { saldoDiario, type Extrato, type Transacao } from "@/lib/extrato/parser";
+import { type Extrato, type Transacao } from "@/lib/extrato/parser";
+import { ultimoSaldoExtrato } from "@/lib/tratativas";
 import { fmt, fmtData } from "@/lib/extrato/store";
 
 interface Props {
@@ -26,10 +27,10 @@ export function RelatorioPainel({ contas, consolidado, saldoIni, saldoFim, entra
     </section>
     <section className="report-section mt-7"><Titulo numero="02" titulo="Posição por banco e conta" />
       <Table><TableHeader><TableRow><TableHead>Banco / conta</TableHead><TableHead>Última data</TableHead><TableHead className="text-right">Saldo inicial</TableHead><TableHead className="text-right">Entradas</TableHead><TableHead className="text-right">Saídas</TableHead><TableHead className="text-right">Fechamento calculado</TableHead></TableRow></TableHeader><TableBody>{contas.map((e) => {
-        const dias = saldoDiario(e); const ultimo = dias.at(-1);
+        const ultimo = ultimoSaldoExtrato(e);
         const receber = e.transacoes.filter((t) => t.tipo === "C").reduce((a, t) => a + t.valor, 0);
         const pagar = e.transacoes.filter((t) => t.tipo === "D").reduce((a, t) => a + t.valor, 0);
-        return <TableRow key={e.id}><TableCell><p className="font-semibold">{e.banco}</p><p className="text-xs text-muted-foreground">Ag {e.agencia || "—"} · CC {e.conta || "—"}</p></TableCell><TableCell>{ultimo ? fmtData(ultimo.data) : "Sem base diária"}</TableCell><TableCell className="num text-right">{fmt(e.saldoInicial)}</TableCell><TableCell className="num text-right text-credit">{fmt(receber)}</TableCell><TableCell className="num text-right text-debit">{fmt(pagar)}</TableCell><TableCell className="num text-right font-semibold">{ultimo ? fmt(ultimo.fechamento) : "Indisponível"}</TableCell></TableRow>;
+        return <TableRow key={e.id}><TableCell><p className="font-semibold">{e.banco}</p><p className="text-xs text-muted-foreground">Ag {e.agencia || "—"} · CC {e.conta || "—"}</p></TableCell><TableCell>{ultimo.data ? fmtData(ultimo.data) : "Sem base diária"}</TableCell><TableCell className="num text-right">{fmt(e.saldoInicial)}</TableCell><TableCell className="num text-right text-credit">{fmt(receber)}</TableCell><TableCell className="num text-right text-debit">{fmt(pagar)}</TableCell><TableCell className="num text-right font-semibold">{fmt(ultimo.saldo)}<p className="text-xs font-normal text-muted-foreground">{ultimo.parcial ? "Saldo parcial calculado" : "Saldo informado"}</p></TableCell></TableRow>;
       })}</TableBody></Table>
       <p className="mt-3 text-xs text-muted-foreground">Mesmos indicadores e contas selecionadas no Painel. As bases podem ter datas diferentes; previsões e ajustes de tesouraria não integram as movimentações realizadas.</p>
     </section>
