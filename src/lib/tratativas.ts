@@ -35,9 +35,9 @@ export function despesasNaData<T extends DespesaPrevista>(itens: T[], data: stri
 }
 
 // Títulos vencidos entram junto das despesas do dia, marcados como não pagos no vencimento.
-export function despesasAteData<T extends DespesaPrevista>(itens: T[], data: string): T[] {
+export function despesasAteData<T extends DespesaPrevista>(itens: T[], data: string, incluirVencidas = true): T[] {
   return itens
-    .filter((i) => i.tipo === "pagar" && i.vencimento <= data)
+    .filter((i) => i.tipo === "pagar" && (incluirVencidas ? i.vencimento <= data : i.vencimento === data))
     .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 }
 

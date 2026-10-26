@@ -6,6 +6,15 @@ const conta: Extrato = { id: "itau", banco: "Itaú", agencia: "1", conta: "123",
 const movimento: Transacao = { id: "1", data: "2026-10-20", tipo: "D", valor: 25.15, descricao: "Despesa", contraparte: "", documento: "" };
 
 describe("Tratativas por data", () => {
+  it("Hoje ignora despesas anteriores e inclui apenas vencimentos de 26/10", () => {
+    const itens = [
+      { tipo: "pagar", vencimento: "2026-10-25", valor: 30 },
+      { tipo: "pagar", vencimento: "2026-10-26", valor: 50 },
+      { tipo: "receber", vencimento: "2026-10-26", valor: 10 },
+      { tipo: "pagar", vencimento: "2026-10-27", valor: 99 },
+    ];
+    expect(despesasAteData(itens, "2026-10-26", false)).toEqual([itens[1]]);
+  });
   it("calcula saldo parcial a partir do inicial, das entradas e das saídas realizadas", () => {
     const parcial: Extrato = { ...conta, saldoInicial: 1000, saldoFinalInformado: null, saldosInformados: [], transacoes: [
       { ...movimento, id: "c", data: "2026-10-26", tipo: "C", valor: 250.50 },
