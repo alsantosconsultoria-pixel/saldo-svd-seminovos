@@ -136,6 +136,8 @@ function Index() {
   const hojeIso = new Date().toISOString().slice(0, 10);
   // futuros só aparecem enquanto a data prevista ainda não chegou; débitos só contam quando saem no extrato
   const futuros = ativos.flatMap((e) => (e.futuros ?? []).filter((t) => t.data > hojeIso).map((t) => ({ ...t, banco: e.banco })));
+  const futReceber = futuros.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
+  const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
   const topSaidas = [...transacoes].filter((t) => t.tipo === "D").sort((a, b) => b.valor - a.valor).slice(0, 8);
 
   async function importar(files: FileList | null) {
