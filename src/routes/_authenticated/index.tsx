@@ -328,20 +328,13 @@ function Index() {
               </Card>
             </div>
             {futuros.length > 0 && (
-              <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Lançamentos futuros</h3>
-                <Table>
-                  <TableBody>
-                    {futuros.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="num text-xs text-muted-foreground">{fmtData(t.data)}</TableCell>
-                        <TableCell>{t.banco}</TableCell>
-                        <TableCell>{t.descricao}</TableCell>
-                        <TableCell className={`num text-right ${t.tipo === "C" ? "text-credit" : "text-debit"}`}>{t.tipo === "D" ? "-" : ""}{fmt(t.valor)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <Card className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+                <h3 className="font-semibold">Previsões futuras dos extratos</h3>
+                <div className="flex flex-wrap items-center gap-6">
+                  <p className="text-sm">A receber: <span className="num font-semibold text-credit">{fmt(futReceber)}</span></p>
+                  <p className="text-sm">A pagar: <span className="num font-semibold text-debit">-{fmt(futPagar)}</span></p>
+                  <p className="text-sm">Saldo previsto: <span className={`num font-semibold ${futReceber - futPagar >= 0 ? "text-credit" : "text-debit"}`}>{fmt(futReceber - futPagar)}</span></p>
+                </div>
               </Card>
             )}
             </div>
