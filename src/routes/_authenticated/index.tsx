@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut, FileText, Stamp } from "lucide-react";
+import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,20 +34,6 @@ export const Route = createFileRoute("/_authenticated/")({
 
 const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.conta}`;
 
-interface Aprovacao {
-  token: string;
-  data: string;
-  decisao: string;
-  aprovado_por: string;
-  ressalvas: string;
-}
-
-const ROTULO_DECISAO: Record<string, string> = {
-  aprovado: "aprovado",
-  aprovado_com_ressalvas: "aprovado com ressalvas",
-  nao_aprovado: "não aprovado",
-};
-
 function Index() {
   const { lista, add, remove, reset } = useExtratos();
   const navigate = useNavigate();
@@ -60,28 +46,6 @@ function Index() {
   const [lancDe, setLancDe] = useState("");
   const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
-  const [aprovacoes, setAprovacoes] = useState<Aprovacao[]>([]);
-
-  // decisões da diretoria registradas pelos links de aprovação
-  useEffect(() => {
-    let ativo = true;
-    async function carregarAprovacoes() {
-      const { data } = await supabase
-        .from("demonstrativos")
-        .select("token, data, decisao, aprovado_por, ressalvas")
-        .not("decisao", "is", null)
-        .order("decidido_em", { ascending: false })
-        .limit(10);
-      if (ativo && data) setAprovacoes(data as Aprovacao[]);
-    }
-    void carregarAprovacoes();
-    const ch = supabase
-      .channel("aprovacoes-painel")
-      .on("postgres_changes", { event: "*", schema: "public", table: "demonstrativos" }, carregarAprovacoes)
-      .subscribe();
-    return () => { ativo = false; void supabase.removeChannel(ch); };
-  }, []);
-
   async function sair() {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
@@ -260,20 +224,6 @@ function Index() {
           <TabsContent value="previsoes"><Previsoes lista={lista} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
-            {aprovacoes.length > 0 && (
-              <div className="space-y-2 print:hidden">
-                {aprovacoes.map((a) => (
-                  <div key={a.token} role="status" className="flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
-                    <Stamp className="size-4 shrink-0 text-primary" />
-                    <span>
-                      Demonstrativo de <b>{fmtData(a.data)}</b> {ROTULO_DECISAO[a.decisao] ?? a.decisao} por <b>{a.aprovado_por}</b>
-                      {a.decisao === "aprovado_com_ressalvas" && a.ressalvas ? ` — ressalvas: ${a.ressalvas}` : ""}.
-                    </span>
-                    <a className="font-medium text-primary underline" href={`/demonstrativo/${a.token}`} target="_blank" rel="noreferrer">Clique aqui para visualizar</a>
-                  </div>
-                ))}
-              </div>
-            )}
             <div className="dashboard-controls flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
               <h2 className="text-xl font-semibold">Demonstração gerencial</h2>
               <div className="flex flex-wrap gap-2">
