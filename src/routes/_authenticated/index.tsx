@@ -60,6 +60,27 @@ function Index() {
   const [lancDe, setLancDe] = useState("");
   const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
+  const [aprovacoes, setAprovacoes] = useState<Aprovacao[]>([]);
+
+  // decisões da diretoria registradas pelos links de aprovação
+  useEffect(() => {
+    let ativo = true;
+    async function carregarAprovacoes() {
+      const { data } = await supabase
+        .from("demonstrativos")
+        .select("token, data, decisao, aprovado_por, ressalvas")
+        .not("decisao", "is", null)
+        .order("decidido_em", { ascending: false })
+        .limit(10);
+      if (ativo && data) setAprovacoes(data as Aprovacao[]);
+    }
+    void carregarAprovacoes();
+    const ch = supabase
+      .channel("aprovacoes-painel")
+      .on("postgres_changes", { event: "*", schema: "public", table: "demonstrativos" }, carregarAprovacoes)
+      .subscribe();
+    return () => { ativo = false; void supabase.removeChannel(ch); };
+  }, []);
 
   async function sair() {
     await supabase.auth.signOut();
