@@ -34,6 +34,20 @@ export const Route = createFileRoute("/_authenticated/")({
 
 const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.conta}`;
 
+interface Aprovacao {
+  token: string;
+  data: string;
+  decisao: string;
+  aprovado_por: string;
+  ressalvas: string;
+}
+
+const ROTULO_DECISAO: Record<string, string> = {
+  aprovado: "aprovado",
+  aprovado_com_ressalvas: "aprovado com ressalvas",
+  nao_aprovado: "não aprovado",
+};
+
 function Index() {
   const { lista, add, remove, reset } = useExtratos();
   const navigate = useNavigate();
