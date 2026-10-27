@@ -24,6 +24,8 @@
 # Painel e lançamentos
 - [x] Painel mostra o saldo do último dia de cada extrato, sem acumular dias.
 - [x] Totais de entradas/saídas só na aba Lançamentos, com filtro de data.
+- [x] Painel avisa quando a diretoria aprova pelo link, com data, nome, ressalvas e atalho para visualizar.
+- [x] Previsões futuras dos extratos em linha horizontal só com totais a pagar e a receber.
 - [ ] Conferir na tela o Painel e o filtro de data (aguarda sessão de teste aprovada).
 
 # Contas vencidas no relatório

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut, FileText } from "lucide-react";
+import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut, FileText, Stamp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,6 +34,20 @@ export const Route = createFileRoute("/_authenticated/")({
 
 const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.conta}`;
 
+interface Aprovacao {
+  token: string;
+  data: string;
+  decisao: string;
+  aprovado_por: string;
+  ressalvas: string;
+}
+
+const ROTULO_DECISAO: Record<string, string> = {
+  aprovado: "aprovado",
+  aprovado_com_ressalvas: "aprovado com ressalvas",
+  nao_aprovado: "não aprovado",
+};
+
 function Index() {
   const { lista, add, remove, reset } = useExtratos();
   const navigate = useNavigate();
@@ -46,6 +60,27 @@ function Index() {
   const [lancDe, setLancDe] = useState("");
   const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
+  const [aprovacoes, setAprovacoes] = useState<Aprovacao[]>([]);
+
+  // decisões da diretoria registradas pelos links de aprovação
+  useEffect(() => {
+    let ativo = true;
+    async function carregarAprovacoes() {
+      const { data } = await supabase
+        .from("demonstrativos")
+        .select("token, data, decisao, aprovado_por, ressalvas")
+        .not("decisao", "is", null)
+        .order("decidido_em", { ascending: false })
+        .limit(10);
+      if (ativo && data) setAprovacoes(data as Aprovacao[]);
+    }
+    void carregarAprovacoes();
+    const ch = supabase
+      .channel("aprovacoes-painel")
+      .on("postgres_changes", { event: "*", schema: "public", table: "demonstrativos" }, carregarAprovacoes)
+      .subscribe();
+    return () => { ativo = false; void supabase.removeChannel(ch); };
+  }, []);
 
   async function sair() {
     await supabase.auth.signOut();
@@ -101,6 +136,8 @@ function Index() {
   const hojeIso = new Date().toISOString().slice(0, 10);
   // futuros só aparecem enquanto a data prevista ainda não chegou; débitos só contam quando saem no extrato
   const futuros = ativos.flatMap((e) => (e.futuros ?? []).filter((t) => t.data > hojeIso).map((t) => ({ ...t, banco: e.banco })));
+  const futReceber = futuros.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
+  const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
   const topSaidas = [...transacoes].filter((t) => t.tipo === "D").sort((a, b) => b.valor - a.valor).slice(0, 8);
 
   async function importar(files: FileList | null) {
@@ -223,6 +260,20 @@ function Index() {
           <TabsContent value="previsoes"><Previsoes lista={lista} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
+            {aprovacoes.length > 0 && (
+              <div className="space-y-2 print:hidden">
+                {aprovacoes.map((a) => (
+                  <div key={a.token} role="status" className="flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
+                    <Stamp className="size-4 shrink-0 text-primary" />
+                    <span>
+                      Demonstrativo de <b>{fmtData(a.data)}</b> {ROTULO_DECISAO[a.decisao] ?? a.decisao} por <b>{a.aprovado_por}</b>
+                      {a.decisao === "aprovado_com_ressalvas" && a.ressalvas ? ` — ressalvas: ${a.ressalvas}` : ""}.
+                    </span>
+                    <a className="font-medium text-primary underline" href={`/demonstrativo/${a.token}`} target="_blank" rel="noreferrer">Clique aqui para visualizar</a>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="dashboard-controls flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
               <h2 className="text-xl font-semibold">Demonstração gerencial</h2>
               <div className="flex flex-wrap gap-2">
@@ -291,20 +342,13 @@ function Index() {
               </Card>
             </div>
             {futuros.length > 0 && (
-              <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Lançamentos futuros</h3>
-                <Table>
-                  <TableBody>
-                    {futuros.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="num text-xs text-muted-foreground">{fmtData(t.data)}</TableCell>
-                        <TableCell>{t.banco}</TableCell>
-                        <TableCell>{t.descricao}</TableCell>
-                        <TableCell className={`num text-right ${t.tipo === "C" ? "text-credit" : "text-debit"}`}>{t.tipo === "D" ? "-" : ""}{fmt(t.valor)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <Card className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+                <h3 className="font-semibold">Previsões futuras dos extratos</h3>
+                <div className="flex flex-wrap items-center gap-6">
+                  <p className="text-sm">A receber: <span className="num font-semibold text-credit">{fmt(futReceber)}</span></p>
+                  <p className="text-sm">A pagar: <span className="num font-semibold text-debit">-{fmt(futPagar)}</span></p>
+                  <p className="text-sm">Saldo previsto: <span className={`num font-semibold ${futReceber - futPagar >= 0 ? "text-credit" : "text-debit"}`}>{fmt(futReceber - futPagar)}</span></p>
+                </div>
               </Card>
             )}
             </div>
