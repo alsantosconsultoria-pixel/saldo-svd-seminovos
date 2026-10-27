@@ -260,6 +260,20 @@ function Index() {
           <TabsContent value="previsoes"><Previsoes lista={lista} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
+            {aprovacoes.length > 0 && (
+              <div className="space-y-2 print:hidden">
+                {aprovacoes.map((a) => (
+                  <div key={a.token} role="status" className="flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
+                    <Stamp className="size-4 shrink-0 text-primary" />
+                    <span>
+                      Demonstrativo de <b>{fmtData(a.data)}</b> {ROTULO_DECISAO[a.decisao] ?? a.decisao} por <b>{a.aprovado_por}</b>
+                      {a.decisao === "aprovado_com_ressalvas" && a.ressalvas ? ` — ressalvas: ${a.ressalvas}` : ""}.
+                    </span>
+                    <a className="font-medium text-primary underline" href={`/demonstrativo/${a.token}`} target="_blank" rel="noreferrer">Clique aqui para visualizar</a>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="dashboard-controls flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
               <h2 className="text-xl font-semibold">Demonstração gerencial</h2>
               <div className="flex flex-wrap gap-2">
