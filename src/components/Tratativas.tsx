@@ -38,14 +38,14 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [salvando, setSalvando] = useState(false);
   const [link, setLink] = useState("");
   const [gerando, setGerando] = useState(false);
-  const [aprovacoes, setAprovacoes] = useState<{ token: string; decisao: string; aprovado_por: string; ressalvas: string }[]>([]);
+  const [aprovacoes, setAprovacoes] = useState<{ id: string; user_id: string; token: string; decisao: string; aprovado_por: string; ressalvas: string }[]>([]);
 
   // decisões da diretoria somente para a data selecionada
   useEffect(() => {
     let ativo = true;
     setAprovacoes([]);
     async function ler() {
-      const { data } = await supabase.from("demonstrativos").select("token, decisao, aprovado_por, ressalvas")
+      const { data } = await supabase.from("demonstrativos").select("id, user_id, token, decisao, aprovado_por, ressalvas")
         .eq("data", dia).not("decisao", "is", null).order("decidido_em", { ascending: false });
       if (ativo && data) setAprovacoes(data as typeof aprovacoes);
     }
@@ -133,6 +133,13 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
     if (error || !data?.length) { toast.error("Somente quem registrou pode desfazer este ajuste."); return; }
     setTransf((t) => t.filter((r) => r.id !== id)); toast.success("Ajuste desfeito.");
   }
+  async function excluirAprovacao(id: string) {
+    if (!confirm("Excluir esta aprovação? O link volta a aceitar uma nova decisão da diretoria.")) return;
+    const { data, error } = await supabase.from("demonstrativos")
+      .update({ decisao: null, ressalvas: "", aprovado_por: "", decidido_em: null }).eq("id", id).select("id");
+    if (error || !data?.length) { toast.error("Somente quem gerou o link pode excluir a aprovação."); return; }
+    setAprovacoes((l) => l.filter((a) => a.id !== id)); toast.success("Aprovação excluída.");
+  }
   async function gerarLink() {
     if (gerando) return;
     setGerando(true);
@@ -173,7 +180,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
           {relatorio && <CompartilharRelatorio titulo={`Demonstrativo de tesouraria · ${fmtData(dia)}`} resumo={`Saldo após ajustes: ${fmt(total)}. Pagamentos propostos: ${fmt(pagamentos)}. Saldo projetado: ${fmt(total - pagamentos)}.${link ? ` Aprovação on-line: ${link}` : ""}`} arquivo={`tesouraria-${dia}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} disabled={carregando || erro} />}
         </div>
       </div>
-      {aprovacoes.map((a) => <div key={a.token} role="status" className="flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm print:hidden"><Stamp className="size-4 shrink-0 text-primary" /><span>O dia <b>{fmtData(dia)}</b> foi {ROTULO[a.decisao] ?? a.decisao} por <b>{a.aprovado_por}</b>{a.decisao === "aprovado_com_ressalvas" && a.ressalvas ? ` — ressalvas: ${a.ressalvas}` : ""}.</span><a className="font-medium text-primary underline" href={`/demonstrativo/${a.token}`} target="_blank" rel="noreferrer">Clique aqui para visualizar</a></div>)}
+      {aprovacoes.map((a) => <div key={a.token} role="status" className="flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm print:hidden"><Stamp className="size-4 shrink-0 text-primary" /><span>O dia <b>{fmtData(dia)}</b> foi {ROTULO[a.decisao] ?? a.decisao} por <b>{a.aprovado_por}</b>{a.decisao === "aprovado_com_ressalvas" && a.ressalvas ? ` — ressalvas: ${a.ressalvas}` : ""}.</span><a className="font-medium text-primary underline" href={`/demonstrativo/${a.token}`} target="_blank" rel="noreferrer">Clique aqui para visualizar</a>{a.user_id === usuario && <Button size="sm" variant="ghost" className="ml-auto text-debit" onClick={() => excluirAprovacao(a.id)}><Trash2 /> Excluir aprovação</Button>}</div>)}
       {relatorio && link && <p className="treasury-controls flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-4 py-3 text-sm print:hidden"><Link2 className="size-4 shrink-0 text-primary" /><span className="font-medium">Link de aprovação:</span><a className="break-all underline" href={link} target="_blank" rel="noreferrer">{link}</a></p>}
       {carregando ? <p role="status" className="py-10 text-center text-muted-foreground">Carregando dados de {fmtData(dia)}…</p> : erro ? <p role="alert" className="border border-destructive/40 p-5 text-debit">Não foi possível carregar os dados desta data. Selecione a data novamente para tentar.</p> : <>
         <div className={`treasury-editor space-y-6 ${relatorio ? "hidden" : ""}`}>
