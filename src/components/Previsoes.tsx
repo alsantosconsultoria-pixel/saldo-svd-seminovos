@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, FileSpreadsheet, FileText, Printer, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, FileText, Printer, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,29 +16,10 @@ import { analisarFluxo } from "@/lib/fluxo-ia.functions";
 
 interface Prev { id: string; tipo: string; vencimento: string; descricao: string; contraparte: string; documento: string; banco: string; categoria: string; valor: number }
 
-const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-const pega = (r: Record<string, unknown>, ...nomes: string[]) => {
-  const k = Object.keys(r).find((k) => nomes.includes(norm(k)));
-  return k && r[k] != null ? r[k] : "";
-};
-function data(v: unknown): string | null {
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  if (typeof v === "number") return new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10);
-  const m = String(v).match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-  return /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? String(v).slice(0, 10) : null;
-}
-function valor(v: unknown): number {
-  if (typeof v === "number") return v;
-  const s = String(v).replace(/[^\d,.-]/g, "");
-  return Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s) || 0;
-}
-
-export function Previsoes({ lista }: { lista: Extrato[] }) {
+export function Previsoes({ lista, atualizacao = 0 }: { lista: Extrato[]; atualizacao?: number }) {
   const [itens, setItens] = useState<Prev[]>([]);
   const [ia, setIa] = useState("");
   const [pensando, setPensando] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
   const dia = hoje();
   const mais = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
   const [de, setDe] = useState(dia);
@@ -54,41 +34,7 @@ export function Previsoes({ lista }: { lista: Extrato[] }) {
     carregar();
     const ch = supabase.channel("prev").on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, carregar).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  async function importar(f: File | undefined) {
-    if (!f) return undefined;
-    try {
-      const wb = XLSX.read(await f.arrayBuffer(), { cellDates: true });
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]!]!);
-      const { data: u } = await supabase.auth.getUser();
-      const novos = rows.flatMap((r) => {
-        const venc = data(pega(r, "data vencimento", "vencimento", "data", "data prevista"));
-        let v = valor(pega(r, "valor titulo", "valor do titulo", "valor"));
-        const t = norm(String(pega(r, "operacao", "tipo")));
-        if (!venc || !v) return [];
-        const tipo = t.startsWith("rec") || t === "c" || t.includes("entrada") ? "receber"
-          : t.startsWith("pag") || t === "d" || t.includes("saida") || t.includes("despesa") ? "pagar" : v < 0 ? "pagar" : "receber";
-        v = Math.abs(v);
-        return [{
-          user_id: u.user!.id, tipo, vencimento: venc, valor: v, arquivo: f.name,
-          descricao: String(pega(r, "descricao", "historico")).replace(/\s+/g, " ").trim(),
-          contraparte: String(pega(r, "cliente/fornecedor", "cliente fornecedor", "contraparte", "fornecedor", "cliente", "favorecido")).trim(),
-          documento: String(pega(r, "no documento", "nº documento", "n documento", "documento")).trim(),
-          banco: String(pega(r, "conta", "banco")), categoria: String(pega(r, "categoria financeira", "categoria")),
-        }];
-      });
-      if (!novos.length) { toast.error("Nenhuma linha válida. Confira as colunas Data vencimento e Valor título."); return undefined; }
-      const { error } = await supabase.from("previsoes").insert(novos);
-      if (error) throw error;
-      toast.success(`${novos.length} previsões importadas.`);
-      carregar();
-    } catch {
-      toast.error("Não foi possível ler a planilha.");
-    } finally {
-      if (input.current) input.current.value = "";
-    }
-  }
+  }, [atualizacao]);
 
   async function limpar() {
     if (!confirm("Apagar todas as previsões que você importou?")) return;
@@ -121,16 +67,7 @@ export function Previsoes({ lista }: { lista: Extrato[] }) {
 
   return (
     <div className="space-y-4">
-      <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
-        <div className="text-sm text-muted-foreground">
-          Planilha com as colunas: <b>Operação</b> (Pagar/Receber), <b>Data vencimento</b>, <b>Cliente/Fornecedor</b>, <b>Nº documento</b>, <b>Valor título</b>.
-        </div>
-        <div className="flex gap-2">
-          <input ref={input} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => importar(e.target.files?.[0])} />
-          <Button onClick={() => input.current?.click()}><FileSpreadsheet /> Importar planilha</Button>
-          {itens.length > 0 && <Button variant="outline" onClick={limpar}><Trash2 /> Limpar</Button>}
-        </div>
-      </Card>
+      {itens.length > 0 && <div className="flex justify-end print:hidden"><Button variant="outline" onClick={limpar}><Trash2 /> Limpar previsões</Button></div>}
 
       <Card className="flex flex-wrap items-end justify-between gap-3 p-5 print:hidden">
         <div className="flex flex-wrap items-end gap-3">

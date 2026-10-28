@@ -1,17 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Printer, LogOut, FileText } from "lucide-react";
+import { Upload, Download, Trash2, RotateCcw, Printer, LogOut, FileText, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
+import { importarPrevisoes } from "@/lib/importar-previsoes";
+import { SaldoDiario } from "@/components/SaldoDiario";
+import { TabelaLancamentos } from "@/components/TabelaLancamentos";
 import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
@@ -41,6 +44,10 @@ function Index() {
   const [carregando, setCarregando] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const inputJSON = useRef<HTMLInputElement>(null);
+  const inputPlanilha = useRef<HTMLInputElement>(null);
+  const importando = useRef(false);
+  const [arrastando, setArrastando] = useState(false);
+  const [atualizacaoPrevisoes, setAtualizacaoPrevisoes] = useState(0);
   const [relatorioPainel, setRelatorioPainel] = useState(false);
   const [aba, setAba] = useState("painel");
   const [lancDe, setLancDe] = useState("");
@@ -83,9 +90,6 @@ function Index() {
     () => transacoes.filter((t) => (!lancDe || t.data >= lancDe) && (!lancAte || t.data <= lancAte)).sort((a, b) => a.data.localeCompare(b.data)),
     [transacoes, lancDe, lancAte],
   );
-  const lancE = lancFiltrados.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
-  const lancS = lancFiltrados.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
-
   const cats = useMemo(() => {
     const m = new Map<string, { cat: string; entradas: number; saidas: number }>();
     transacoes.forEach((t) => {
@@ -104,9 +108,8 @@ function Index() {
   const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
   const topSaidas = [...transacoes].filter((t) => t.tipo === "D").sort((a, b) => b.valor - a.valor).slice(0, 8);
 
-  async function importar(files: FileList | null) {
+  async function importar(files: File[]) {
     if (!files?.length) return;
-    setCarregando(true);
     const { pdfParaLinhas } = await import("@/lib/extrato/pdf");
     for (const f of Array.from(files)) {
       const id = toast.loading(`Lendo ${f.name}...`);
@@ -134,8 +137,38 @@ function Index() {
         console.error(err);
       }
     }
-    setCarregando(false);
     if (input.current) input.current.value = "";
+  }
+
+  async function importarArquivos(files: FileList | File[] | null) {
+    if (!files?.length || importando.current) return;
+    importando.current = true;
+    setCarregando(true);
+    setArrastando(false);
+    try {
+      const arquivos = Array.from(files);
+      const pdfs = arquivos.filter((f) => /\.pdf$/i.test(f.name));
+      const planilhas = arquivos.filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
+      if (pdfs.length + planilhas.length !== arquivos.length) toast.error("Use extratos PDF ou planilhas Excel/CSV.");
+      if (pdfs.length) await importar(pdfs);
+      for (const arquivo of planilhas) {
+        const aviso = toast.loading(`Lendo ${arquivo.name}...`);
+        try {
+          const total = await importarPrevisoes(arquivo);
+          toast.success(`${total} previsões importadas.`, { id: aviso });
+          setAtualizacaoPrevisoes((v) => v + 1);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Não foi possível ler a planilha.", { id: aviso });
+        }
+      }
+    } catch {
+      toast.error("Não foi possível importar os arquivos. Tente novamente.");
+    } finally {
+      importando.current = false;
+      setCarregando(false);
+      if (input.current) input.current.value = "";
+      if (inputPlanilha.current) inputPlanilha.current.value = "";
+    }
   }
 
   function restaurarJSON(files: FileList | null) {
@@ -170,7 +203,19 @@ function Index() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" onDragOver={(e) => {
+      if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = carregando ? "none" : "copy";
+      if (!carregando) setArrastando(true);
+    }} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastando(false); }} onDrop={(e) => {
+      e.preventDefault();
+      setArrastando(false);
+      void importarArquivos(e.dataTransfer.files);
+    }}>
+      {arrastando && <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center border-4 border-dashed border-accent bg-background/95">
+        <div className="flex flex-col items-center gap-3 text-primary"><Upload className="size-12" /><p className="text-xl font-semibold">Importar arquivos</p><p className="text-sm text-muted-foreground">Extratos PDF · Planilhas Excel / CSV</p></div>
+      </div>}
       <header className="border-b bg-primary text-primary-foreground print:bg-transparent print:text-foreground">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-5">
           <div>
@@ -178,10 +223,12 @@ function Index() {
             <h1 className="text-2xl font-semibold">Saldo Diário · Multi-bancos</h1>
           </div>
           <div className="flex flex-wrap gap-2 print:hidden">
-            <input ref={input} type="file" accept="application/pdf" multiple hidden onChange={(e) => importar(e.target.files)} />
+            <input ref={input} type="file" accept="application/pdf" multiple hidden onChange={(e) => importarArquivos(e.target.files)} />
             <Button variant="secondary" onClick={() => input.current?.click()} disabled={carregando}>
-              <Upload /> {carregando ? "Lendo PDF..." : "Importar extrato PDF"}
+              <Upload /> {carregando ? "Importando..." : "Importar extrato PDF"}
             </Button>
+            <input ref={inputPlanilha} type="file" accept=".xlsx,.xls,.csv" multiple hidden onChange={(e) => importarArquivos(e.target.files)} />
+            <Button variant="secondary" onClick={() => inputPlanilha.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar planilha</Button>
             <Button variant="secondary" onClick={() => window.print()}><Printer /> Imprimir</Button>
             <Button variant="secondary" onClick={sair}><LogOut /> Sair</Button>
           </div>
@@ -221,7 +268,7 @@ function Index() {
           </TabsList>
 
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
-          <TabsContent value="previsoes"><Previsoes lista={lista} /></TabsContent>
+          <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
             <div className="dashboard-controls flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
@@ -304,42 +351,7 @@ function Index() {
             </div>
           </TabsContent>
 
-          <TabsContent value="diario" className="space-y-4">
-            {ativos.map((e) => (
-              <Card key={e.id} className="p-5">
-                <h3 className="mb-3 font-semibold">{contaLabel(e)}</h3>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead><TableHead className="text-right">Abertura</TableHead><TableHead className="text-right">Entradas</TableHead>
-                      <TableHead className="text-right">Saídas</TableHead><TableHead className="text-right">Fechamento calculado</TableHead>
-                      <TableHead className="text-right">Saldo do banco</TableHead><TableHead>Conferência</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {saldoDiario(e).length === 0 && (
-                      <TableRow><TableCell colSpan={7} className="text-muted-foreground">Sem lançamentos nem saldo no período.</TableCell></TableRow>
-                    )}
-                    {saldoDiario(e).map((d) => (
-                      <TableRow key={d.data}>
-                        <TableCell className="num">{fmtData(d.data)}</TableCell>
-                        <TableCell className="num text-right">{fmt(d.abertura)}</TableCell>
-                        <TableCell className="num text-right text-credit">{fmt(d.entradas)}</TableCell>
-                        <TableCell className="num text-right text-debit">{fmt(d.saidas)}</TableCell>
-                        <TableCell className="num text-right font-semibold">{fmt(d.fechamento)}</TableCell>
-                        <TableCell className="num text-right">{d.informado === null ? "—" : fmt(d.informado)}</TableCell>
-                        <TableCell>
-                          {d.ok === null ? <span className="text-xs text-muted-foreground">Saldo parcial calculado</span>
-                            : d.ok ? <span className="inline-flex items-center gap-1 text-sm text-credit"><CheckCircle2 className="size-4" /> OK</span>
-                            : <span className="inline-flex items-center gap-1 text-sm text-debit"><AlertTriangle className="size-4" /> Dif. {fmt((d.informado ?? 0) - d.fechamento)}</span>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-            ))}
-          </TabsContent>
+          <TabsContent value="diario"><SaldoDiario contas={ativos} /></TabsContent>
 
           <TabsContent value="lanc">
             <Card className="p-5">
@@ -357,38 +369,7 @@ function Index() {
                 )}
                 <span className="ml-auto text-sm text-muted-foreground">{lancFiltrados.length} lançamentos</span>
               </div>
-              <Table>
-                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Banco</TableHead><TableHead>Descrição</TableHead><TableHead>Contraparte</TableHead><TableHead>CNPJ/CPF</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {lancFiltrados.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-muted-foreground">Nenhum lançamento no período.</TableCell></TableRow>
-                  )}
-                  {lancFiltrados.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="num">{fmtData(t.data)}</TableCell>
-                      <TableCell>{t.banco}</TableCell>
-                      <TableCell>{t.descricao}</TableCell>
-                      <TableCell className="text-muted-foreground">{t.contraparte}</TableCell>
-                      <TableCell className="num text-xs">{t.documento}</TableCell>
-                      <TableCell className={`num text-right ${t.tipo === "C" ? "text-credit" : "text-debit"}`}>{t.tipo === "D" ? "-" : ""}{fmt(t.valor)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-right font-medium">Total de entradas</TableCell>
-                    <TableCell className="num text-right font-semibold text-credit">{fmt(lancE)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-right font-medium">Total de saídas</TableCell>
-                    <TableCell className="num text-right font-semibold text-debit">-{fmt(lancS)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-right font-medium">Resultado do período</TableCell>
-                    <TableCell className={`num text-right font-semibold ${lancE - lancS >= 0 ? "text-credit" : "text-debit"}`}>{fmt(lancE - lancS)}</TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
+              <TabelaLancamentos itens={lancFiltrados} />
             </Card>
           </TabsContent>
 

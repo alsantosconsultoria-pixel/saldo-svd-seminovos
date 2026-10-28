@@ -1,3 +1,8 @@
+# Importação e composição diária
+- [ ] Reunir importações de PDF e planilha no topo e aceitar arquivos arrastados.
+- [ ] Abrir composição de receitas, despesas, saldos e total do dia em Saldo diário.
+- [ ] Testar importação e composição na tela com conta conectada.
+
 # Saldo parcial de extratos
 - [x] Calcular o último saldo pelas movimentações quando faltar fechamento informado e identificar como parcial.
 - [x] Testar saldo sem fechamento e continuidade após o último saldo conhecido.
