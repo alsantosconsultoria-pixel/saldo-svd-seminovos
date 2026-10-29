@@ -1,7 +1,7 @@
 # Importação e composição diária
-- [ ] Reunir importações de PDF e planilha no topo e aceitar arquivos arrastados.
-- [ ] Abrir composição de receitas, despesas, saldos e total do dia em Saldo diário.
-- [ ] Testar importação e composição na tela com conta conectada.
+- [x] Reunir importações de PDF e planilha no topo e aceitar arquivos arrastados.
+- [x] Abrir composição de receitas, despesas, saldos e total do dia em Saldo diário; filtros e CSV brasileiro cobertos por testes.
+- [ ] Concluir a conferência de importação por arraste e todas as composições com conta conectada (sessão expirou; receitas, despesas, botões e arraste visual conferidos antes da expiração).
 
 # Saldo parcial de extratos
 - [x] Calcular o último saldo pelas movimentações quando faltar fechamento informado e identificar como parcial.

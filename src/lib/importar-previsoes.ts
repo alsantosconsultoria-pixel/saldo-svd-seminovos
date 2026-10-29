@@ -20,7 +20,9 @@ function valor(v: unknown): number {
 }
 
 export async function importarPrevisoes(f: File): Promise<number> {
-  const wb = XLSX.read(await f.arrayBuffer(), { cellDates: true });
+  const wb = /\.csv$/i.test(f.name)
+    ? XLSX.read(await f.text(), { type: "string", raw: true })
+    : XLSX.read(await f.arrayBuffer(), { cellDates: true });
   const nome = wb.SheetNames[0];
   const folha = nome ? wb.Sheets[nome] : undefined;
   if (!folha) throw new Error("A planilha não tem uma aba para leitura.");
