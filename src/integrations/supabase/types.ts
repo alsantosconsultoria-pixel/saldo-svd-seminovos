@@ -122,6 +122,57 @@ export type Database = {
         }
         Relationships: []
       }
+      realizados: {
+        Row: {
+          arquivo: string
+          categoria: string
+          chave: string
+          conta: string
+          contraparte: string
+          criado_em: string
+          data: string
+          descricao: string
+          documento: string
+          id: string
+          tipo: string
+          user_id: string
+          valor: number
+          vinculo: string | null
+        }
+        Insert: {
+          arquivo?: string
+          categoria?: string
+          chave: string
+          conta?: string
+          contraparte?: string
+          criado_em?: string
+          data: string
+          descricao?: string
+          documento?: string
+          id?: string
+          tipo: string
+          user_id: string
+          valor: number
+          vinculo?: string | null
+        }
+        Update: {
+          arquivo?: string
+          categoria?: string
+          chave?: string
+          conta?: string
+          contraparte?: string
+          criado_em?: string
+          data?: string
+          descricao?: string
+          documento?: string
+          id?: string
+          tipo?: string
+          user_id?: string
+          valor?: number
+          vinculo?: string | null
+        }
+        Relationships: []
+      }
       transferencias: {
         Row: {
           criado_em: string
