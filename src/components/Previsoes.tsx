@@ -13,10 +13,12 @@ import { fluxoCaixa, fluxoPeriodo, type DiaFluxo } from "@/lib/fluxo";
 import { Input } from "@/components/ui/input";
 import { ultimoSaldoExtrato } from "@/lib/tratativas";
 import { analisarFluxo } from "@/lib/fluxo-ia.functions";
+import { realizadoPorDia, type Realizado } from "@/lib/realizado";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Prev { id: string; tipo: string; vencimento: string; descricao: string; contraparte: string; documento: string; banco: string; categoria: string; valor: number }
 
-export function Previsoes({ lista, atualizacao = 0 }: { lista: Extrato[]; atualizacao?: number }) {
+export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: Extrato[]; atualizacao?: number; realizados?: Realizado[] }) {
   const [itens, setItens] = useState<Prev[]>([]);
   const [ia, setIa] = useState("");
   const [pensando, setPensando] = useState(false);
@@ -102,6 +104,11 @@ export function Previsoes({ lista, atualizacao = 0 }: { lista: Extrato[]; atuali
           </ul>
         </Card>
       )}
+
+      <Card className="p-5">
+        <h3 className="mb-3 font-semibold">Realizado por data</h3>
+        <RealizadoLinha realizados={realizados} de={de} ate={ate} />
+      </Card>
 
       {periodo.length > 0 && <Card className="p-5"><h3 className="mb-3 font-semibold">Curva dos saldos</h3><Curva periodo={periodo} /></Card>}
       <Card className="p-5">
@@ -201,4 +208,34 @@ function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores }:
     </section>}
     <footer className="border-t pt-3 text-xs text-muted-foreground">Projeção baseada nas previsões importadas; sem baixa nos saldos bancários. Gerado em {new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.</footer>
   </article>;
+}
+
+function RealizadoLinha({ realizados, de, ate }: { realizados: Realizado[]; de: string; ate: string }) {
+  const [aberto, setAberto] = useState<{ data: string; tipo: "pagar" | "receber" } | null>(null);
+  const dias = realizadoPorDia(realizados, de, ate);
+  if (!dias.length) return <p className="text-sm text-muted-foreground">Nenhum realizado no período. Use "Importar realizado" e escolha um período que inclua dias passados.</p>;
+  const n = (v: number) => fmt(v).replace("R$", "").trim();
+  const cel = "num whitespace-nowrap border-l px-3 py-2 text-right";
+  const rot = "sticky left-0 z-10 whitespace-nowrap bg-card px-3 py-2 text-left font-medium";
+  const link = (d: string, tipo: "pagar" | "receber", v: number, cor: string) => v ? <button type="button" className={`${cor} underline decoration-dotted underline-offset-4 hover:opacity-70`} onClick={() => setAberto({ data: d, tipo })}>{n(v)}</button> : "—";
+  const comp = aberto ? realizados.filter((r) => r.data === aberto.data && r.tipo === aberto.tipo) : [];
+  return <>
+    <div className="overflow-x-auto"><table className="w-full border-collapse text-sm">
+      <thead><tr className="border-b bg-muted/40"><th className={rot + " bg-muted"}>Data</th>{dias.map((d) => <th key={d.data} className={cel + " font-semibold"}>{fmtData(d.data).slice(0, 5)}</th>)}</tr></thead>
+      <tbody>
+        <tr className="border-b"><td className={rot}>Despesa paga</td>{dias.map((d) => <td key={d.data} className={cel}>{link(d.data, "pagar", d.pago, "text-debit")}</td>)}</tr>
+        <tr className="border-b"><td className={rot}>Receita recebida</td>{dias.map((d) => <td key={d.data} className={cel}>{link(d.data, "receber", d.recebido, "text-credit")}</td>)}</tr>
+        <tr className="bg-muted/30 font-semibold"><td className={rot + " bg-muted"}>Total do dia</td>{dias.map((d) => <td key={d.data} className={`${cel} ${d.recebido - d.pago < 0 ? "text-debit" : ""}`}>{n(d.recebido - d.pago)}</td>)}</tr>
+      </tbody>
+    </table></div>
+    <Dialog open={!!aberto} onOpenChange={(o) => !o && setAberto(null)}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader><DialogTitle>{aberto?.tipo === "pagar" ? "Despesas pagas" : "Receitas recebidas"} em {aberto && fmtData(aberto.data)} · {fmt(comp.reduce((a, r) => a + r.valor, 0))}</DialogTitle></DialogHeader>
+        <div className="max-h-[60vh] overflow-auto"><Table>
+          <TableHeader><TableRow><TableHead>Cliente/Fornecedor</TableHead><TableHead>Categoria</TableHead><TableHead>Nº documento</TableHead><TableHead>Conta</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+          <TableBody>{comp.map((r) => <TableRow key={r.id}><TableCell className="whitespace-normal">{r.contraparte || "—"}</TableCell><TableCell className="text-xs">{r.categoria}</TableCell><TableCell className="text-xs">{r.documento}</TableCell><TableCell className="text-xs">{r.conta}</TableCell><TableCell className="num text-right">{fmt(r.valor)}</TableCell></TableRow>)}</TableBody>
+        </Table></div>
+      </DialogContent>
+    </Dialog>
+  </>;
 }
