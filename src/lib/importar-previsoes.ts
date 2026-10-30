@@ -1,19 +1,19 @@
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 
-const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-const pega = (r: Record<string, unknown>, ...nomes: string[]) => {
+export const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+export const pega = (r: Record<string, unknown>, ...nomes: string[]) => {
   const k = Object.keys(r).find((k) => nomes.includes(norm(k)));
   return k && r[k] != null ? r[k] : "";
 };
-function data(v: unknown): string | null {
+export function data(v: unknown): string | null {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   if (typeof v === "number") return new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10);
   const m = String(v).match(/(\d{2})\/(\d{2})\/(\d{4})/);
   if (m) return `${m[3]}-${m[2]}-${m[1]}`;
   return /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? String(v).slice(0, 10) : null;
 }
-function valor(v: unknown): number {
+export function valor(v: unknown): number {
   if (typeof v === "number") return v;
   const s = String(v).replace(/[^\d,.-]/g, "");
   return Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s) || 0;
