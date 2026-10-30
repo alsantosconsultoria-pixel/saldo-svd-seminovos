@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 import { importarPrevisoes } from "@/lib/importar-previsoes";
+import { associar, carregarRealizados, importarRealizado, type Realizado } from "@/lib/realizado";
+import { PendenciasRealizado } from "@/components/PendenciasRealizado";
 import { SaldoDiario } from "@/components/SaldoDiario";
 import { TabelaLancamentos } from "@/components/TabelaLancamentos";
 import { Tratativas } from "@/components/Tratativas";
@@ -48,6 +50,26 @@ function Index() {
   const importando = useRef(false);
   const [arrastando, setArrastando] = useState(false);
   const [atualizacaoPrevisoes, setAtualizacaoPrevisoes] = useState(0);
+  const [realizados, setRealizados] = useState<Realizado[]>([]);
+  const inputRealizado = useRef<HTMLInputElement>(null);
+  const recarregarRealizados = () => carregarRealizados().then(setRealizados).catch(() => {});
+  useEffect(() => {
+    recarregarRealizados();
+    const ch = supabase.channel("realizados").on("postgres_changes", { event: "*", schema: "public", table: "realizados" }, recarregarRealizados).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+  const associacao = useMemo(() => associar(realizados, lista), [realizados, lista]);
+  async function importarRealizadoArquivo(files: FileList | null) {
+    const f = files?.[0];
+    if (inputRealizado.current) inputRealizado.current.value = "";
+    if (!f) return;
+    const aviso = toast.loading(`Lendo realizado de ${f.name}...`);
+    try {
+      const r = await importarRealizado(f);
+      toast.success(`${r.lidos} lançamentos realizados lidos, ${r.novos} novos (repetidos ignorados).`, { id: aviso });
+      recarregarRealizados();
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível ler a planilha.", { id: aviso }); }
+  }
   const [relatorioPainel, setRelatorioPainel] = useState(false);
   const [aba, setAba] = useState("painel");
   const [lancDe, setLancDe] = useState("");
@@ -76,7 +98,7 @@ function Index() {
     });
   }, [ativos]);
 
-  const transacoes = ativos.flatMap((e) => e.transacoes.map((t) => ({ ...t, banco: e.banco, conta: e.conta })));
+  const transacoes = ativos.flatMap((e) => e.transacoes.map((t) => ({ ...t, banco: e.banco, conta: e.conta, extratoId: e.id })));
   // painel: saldo do último dia de cada extrato — nunca acumulado/somado entre dias
   const saldoIni = ativos.reduce((a, e) => a + e.saldoInicial, 0);
   const saldosAtuais = ativos.map(ultimoSaldoExtrato);
@@ -228,7 +250,9 @@ function Index() {
               <Upload /> {carregando ? "Importando..." : "Importar extrato PDF"}
             </Button>
             <input ref={inputPlanilha} type="file" accept=".xlsx,.xls,.csv" multiple hidden onChange={(e) => importarArquivos(e.target.files)} />
-            <Button variant="secondary" onClick={() => inputPlanilha.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar planilha</Button>
+            <Button variant="secondary" onClick={() => inputPlanilha.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar previsões</Button>
+            <input ref={inputRealizado} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => importarRealizadoArquivo(e.target.files)} />
+            <Button variant="secondary" onClick={() => inputRealizado.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar realizado</Button>
             <Button variant="secondary" onClick={() => window.print()}><Printer /> Imprimir</Button>
             <Button variant="secondary" onClick={sair}><LogOut /> Sair</Button>
           </div>
@@ -264,11 +288,11 @@ function Index() {
             <TabsTrigger value="lanc">Lançamentos</TabsTrigger>
             <TabsTrigger value="contas">Contas</TabsTrigger>
             <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>
-            <TabsTrigger value="previsoes">Previsões</TabsTrigger>
+            <TabsTrigger value="previsoes">Fluxo</TabsTrigger>
           </TabsList>
 
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
-          <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} /></TabsContent>
+          <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} realizados={realizados} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
             <div className="dashboard-controls flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
@@ -369,7 +393,10 @@ function Index() {
                 )}
                 <span className="ml-auto text-sm text-muted-foreground">{lancFiltrados.length} lançamentos</span>
               </div>
-              <TabelaLancamentos itens={lancFiltrados} />
+              <TabelaLancamentos itens={lancFiltrados} vinculos={associacao.porLanc} />
+            </Card>
+            <Card className="mt-4 p-5">
+              <PendenciasRealizado pendentes={associacao.pendentes} lista={lista} aoVincular={recarregarRealizados} />
             </Card>
           </TabsContent>
 
