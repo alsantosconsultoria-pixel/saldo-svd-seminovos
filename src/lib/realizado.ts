@@ -22,10 +22,11 @@ export function mesmaConta(contaPlanilha: string, e: Pick<Extrato, "conta">): bo
 
 // Lê a planilha: só linhas com conta bancária e valor pago entram como realizado.
 export function lerRealizado(rows: Record<string, unknown>[]): LinhaRealizado[] {
-  return rows.flatMap((r) => {
+  const vistos = new Map<string, number>();
+  return rows.flatMap((r): LinhaRealizado[] => {
     const conta = String(pega(r, "conta")).trim();
     if (!numeroConta(conta) || /^0+$/.test(numeroConta(conta) || "0")) return [];
-    const d = data(pega(r, "data pagamento/recebimento", "data baixa"));
+    const d = data(pega(r, "data pagamento/recebimento") || pega(r, "data baixa"));
     const v = Math.abs(valor(pega(r, "total pago")) || valor(pega(r, "valor titulo")));
     const op = norm(String(pega(r, "operacao")));
     if (!d || !v || !(op.startsWith("pag") || op.startsWith("rec"))) return [];
@@ -38,7 +39,7 @@ export function lerRealizado(rows: Record<string, unknown>[]): LinhaRealizado[] 
       categoria: String(pega(r, "categoria financeira")).trim(),
       chave: [tipo, d, numeroConta(conta), v.toFixed(2), documento, contraparte, String(pega(r, "data emissao"))].join("|"),
     }];
-  });
+  }).map((l) => { const n = (vistos.get(l.chave) ?? 0) + 1; vistos.set(l.chave, n); return n > 1 ? { ...l, chave: `${l.chave}|${n}` } : l; });
 }
 
 export const chaveLanc = (extratoId: string, t: Pick<Transacao, "id">) => `${extratoId}|${t.id}`;
