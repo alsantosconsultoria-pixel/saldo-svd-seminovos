@@ -73,6 +73,7 @@ function Index() {
   const [relatorioPainel, setRelatorioPainel] = useState(false);
   const [aba, setAba] = useState("painel");
   const [lancDe, setLancDe] = useState("");
+  const [lancConta, setLancConta] = useState("todas");
   const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
   async function sair() {
