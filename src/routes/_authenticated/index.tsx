@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 import { importarPrevisoes } from "@/lib/importar-previsoes";
-import { associar, carregarRealizados, importarRealizado, type Realizado } from "@/lib/realizado";
+import { associar, extratoSemVinculo, mesmaConta, carregarRealizados, importarRealizado, type Realizado } from "@/lib/realizado";
 import { PendenciasRealizado } from "@/components/PendenciasRealizado";
 import { SaldoDiario } from "@/components/SaldoDiario";
 import { TabelaLancamentos } from "@/components/TabelaLancamentos";
