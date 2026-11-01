@@ -12,11 +12,26 @@ const sinal = (n: number) => <span className={n >= 0 ? "text-credit" : "text-deb
 
 export function PendenciasRealizado({ pendentes, extrato, lista, aoVincular }: { pendentes: Realizado[]; extrato: LancamentoExibido[]; lista: Extrato[]; aoVincular: () => void }) {
   const [escolha, setEscolha] = useState<Record<string, string>>({});
+  const [feitos, setFeitos] = useState<Record<string, string>>({});
+  const [bancoSel, setBancoSel] = useState("");
+  const usados = new Set(Object.values(feitos));
+  pendentes = pendentes.filter((r) => !feitos[r.id]);
+  extrato = extrato.filter((t) => !usados.has(`${t.extratoId}|${t.id}`));
+  const contas = lista.map((e) => ({ k: `${e.banco}|${e.conta}`, nome: `${e.banco} · CC ${e.conta}`, e }));
+  const bancoDe = (r: Realizado) => contas.find((c) => mesmaConta(r.conta, c.e))?.k ?? `?|${r.conta}`;
+  const bancos = [...new Set([...pendentes.map(bancoDe), ...extrato.map((t) => `${t.banco}|${t.conta}`)])].map((k) => {
+    const real = pendentes.filter((r) => bancoDe(r) === k), ext = extrato.filter((t) => `${t.banco}|${t.conta}` === k);
+    const sr = real.reduce((a, i) => a + (i.tipo === "receber" ? i.valor : -i.valor), 0);
+    const se = ext.reduce((a, i) => a + (i.tipo === "C" ? i.valor : -i.valor), 0);
+    return { k, nome: contas.find((c) => c.k === k)?.nome ?? k.split("|")[1]!, real, ext, n: real.length + ext.length, dif: Math.round((sr - se) * 100) / 100 };
+  }).sort((a, b) => a.nome.localeCompare(b.nome));
+  const atual = bancos.find((b) => b.k === bancoSel);
   async function vincular(r: Realizado) {
     const v = escolha[r.id];
     if (!v) return;
     const { error } = await supabase.from("realizados").update({ vinculo: v }).eq("id", r.id).select("id").single();
     if (error) { toast.error("Só quem importou o realizado pode associá-lo."); return; }
+    setFeitos((f) => ({ ...f, [r.id]: v }));
     toast.success("Associação salva.");
     aoVincular();
   }
@@ -24,17 +39,24 @@ export function PendenciasRealizado({ pendentes, extrato, lista, aoVincular }: {
   const candidatos = (r: Realizado) => lista.filter((e) => mesmaConta(r.conta, e)).flatMap((e) =>
     e.transacoes.filter((t) => t.tipo === (r.tipo === "pagar" ? "D" : "C") && livres.has(chaveLanc(e.id, t))).map((t) => ({ k: chaveLanc(e.id, t), t })))
     .sort((a, b) => Math.abs(a.t.valor - r.valor) - Math.abs(b.t.valor - r.valor)).slice(0, 30);
-  const dias = pendenciasPorDia(pendentes, extrato);
+  const dias = atual ? pendenciasPorDia(atual.real, atual.ext) : [];
   return <div>
     <h3 className="mb-1 font-semibold">Pendências de associação</h3>
-    <p className="mb-3 text-sm text-muted-foreground">À esquerda, realizados da planilha sem lançamento no extrato; à direita, lançamentos do extrato sem realizado. Separados por data — o saldo do dia deve bater dos dois lados.</p>
-    {dias.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma pendência.</p> : <div className="max-h-[40rem] space-y-4 overflow-auto">
+    <p className="mb-3 text-sm text-muted-foreground">Saldo a associar por banco. Clique em um banco para trabalhar nas associações.</p>
+    {bancos.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma pendência.</p> : <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {bancos.map((b) => <button key={b.k} onClick={() => setBancoSel(bancoSel === b.k ? "" : b.k)} className={`rounded-md border p-3 text-left text-sm hover:bg-muted/50 ${bancoSel === b.k ? "border-primary bg-muted/50" : ""}`}>
+        <div className="font-medium">{b.nome}</div>
+        <div className="text-xs text-muted-foreground">{b.n} pendência(s)</div>
+        <div className="mt-1">Saldo a associar: {sinal(b.dif)}</div>
+      </button>)}
+    </div>}
+    {atual && <div className="max-h-[40rem] space-y-4 overflow-auto">
       {dias.map((d) => <div key={d.data} className="rounded-md border">
         <div className="flex flex-wrap items-center gap-4 border-b bg-muted/40 px-3 py-2 text-sm">
           <strong className="num">{fmtData(d.data)}</strong>
           <span>Realizado: {sinal(d.saldoReal)}</span>
           <span>Extrato: {sinal(d.saldoExt)}</span>
-          <span className="ml-auto">{d.diferenca === 0 ? <span className="text-credit">Saldo do dia bate</span> : <>Diferença: {sinal(d.diferenca)}</>}</span>
+          <span className="ml-auto">{d.diferenca === 0 ? <span className="text-credit">Saldo do dia bate</span> : <>Saldo a regularizar: {sinal(d.diferenca)}</>}</span>
         </div>
         <div className="grid gap-0 md:grid-cols-2 md:divide-x">
           <div className="p-3">
