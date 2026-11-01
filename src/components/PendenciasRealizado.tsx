@@ -26,8 +26,15 @@ export function PendenciasRealizado({ pendentes, extrato, lista, aoVincular }: {
     return { k, nome: contas.find((c) => c.k === k)?.nome ?? k.split("|")[1]!, real, ext, n: real.length + ext.length, dif: Math.round((sr - se) * 100) / 100 };
   }).sort((a, b) => a.nome.localeCompare(b.nome));
   const atual = bancos.find((b) => b.k === bancoSel);
-  async function vincular(r: Realizado) {
-    const v = escolha[r.id];
+  const [escExt, setEscExt] = useState<Record<string, string>>({});
+  const doRelatorio = (t: LancamentoExibido) => pendentes.filter((r) => (r.tipo === "pagar" ? "D" : "C") === t.tipo)
+    .sort((a, b) => (a.data === t.data ? 0 : 1) - (b.data === t.data ? 0 : 1) || Math.abs(a.valor - t.valor) - Math.abs(b.valor - t.valor)).slice(0, 40);
+  async function vincularExt(t: LancamentoExibido) {
+    const k = `${t.extratoId}|${t.id}`, r = pendentes.find((x) => x.id === escExt[k]);
+    if (r) await vincular(r, k);
+  }
+  async function vincular(r: Realizado, forcado?: string) {
+    const v = forcado ?? escolha[r.id];
     if (!v) return;
     const { error } = await supabase.from("realizados").update({ vinculo: v }).eq("id", r.id).select("id").single();
     if (error) { toast.error("Só quem importou o realizado pode associá-lo."); return; }
@@ -79,10 +86,19 @@ export function PendenciasRealizado({ pendentes, extrato, lista, aoVincular }: {
           <div className="p-3">
             <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Extrato ({d.ext.length})</div>
             {d.ext.length === 0 && <p className="text-xs text-muted-foreground">Sem pendências.</p>}
-            {d.ext.map((t) => <div key={`${t.extratoId}|${t.id}`} className="mb-2 flex justify-between gap-2 border-b pb-2 text-sm last:border-0">
-              <span>{t.descricao}<div className="text-xs text-muted-foreground">{t.banco} · CC {t.conta}{t.contraparte && ` · ${t.contraparte}`}</div></span>
-              <span className={`num ${t.tipo === "C" ? "text-credit" : "text-debit"}`}>{t.tipo === "D" ? "-" : ""}{fmt(t.valor)}</span>
-            </div>)}
+            {d.ext.map((t) => { const k = `${t.extratoId}|${t.id}`, op = doRelatorio(t); return <div key={k} className="mb-3 border-b pb-2 text-sm last:border-0">
+              <div className="flex justify-between gap-2">
+                <span>{t.descricao}<div className="text-xs text-muted-foreground">{t.banco} · CC {t.conta}{t.contraparte && ` · ${t.contraparte}`}</div></span>
+                <span className={`num ${t.tipo === "C" ? "text-credit" : "text-debit"}`}>{t.tipo === "D" ? "-" : ""}{fmt(t.valor)}</span>
+              </div>
+              <div className="mt-1 flex gap-2">
+                {op.length ? <Select value={escExt[k] ?? ""} onValueChange={(v) => setEscExt((s) => ({ ...s, [k]: v }))}>
+                  <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Associar à pendência do relatório" /></SelectTrigger>
+                  <SelectContent>{op.map((r) => <SelectItem key={r.id} value={r.id}>{fmtData(r.data)} · {fmt(r.valor)} · {r.contraparte.slice(0, 30)}</SelectItem>)}</SelectContent>
+                </Select> : <span className="flex-1 text-xs text-muted-foreground">Sem pendência do relatório</span>}
+                <Button size="sm" onClick={() => vincularExt(t)} disabled={!escExt[k]}>Associar</Button>
+              </div>
+            </div>; })}
           </div>
         </div>
       </div>)}
