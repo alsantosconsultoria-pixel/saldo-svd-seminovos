@@ -22,3 +22,11 @@ describe("Importar realizado", () => {
     expect(realizadoPorDia([{ data: "2026-10-06", tipo: "pagar", valor: 1.1 }, { data: "2026-10-06", tipo: "pagar", valor: 2.2 }], "2026-10-01", "2026-10-31")).toEqual([{ data: "2026-10-06", pago: 3.3, recebido: 0 }]);
   });
 });
+
+import { pendenciasPorDia } from "./realizado";
+describe("Pendências por dia", () => {
+  it("compara saldo das pendências do realizado e do extrato na mesma data", () => {
+    const d = pendenciasPorDia([{ data: "2026-10-06", tipo: "pagar" as const, valor: 300 }], [{ data: "2026-10-06", tipo: "D" as const, valor: 100 }, { data: "2026-10-06", tipo: "D" as const, valor: 200 }, { data: "2026-10-07", tipo: "C" as const, valor: 50 }]);
+    expect(d.map((x) => [x.data, x.saldoReal, x.saldoExt, x.diferenca])).toEqual([["2026-10-06", -300, -300, 0], ["2026-10-07", 0, 50, -50]]);
+  });
+});

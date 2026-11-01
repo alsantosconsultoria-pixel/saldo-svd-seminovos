@@ -104,3 +104,25 @@ export async function carregarRealizados(): Promise<Realizado[]> {
     if (!d || d.length < 1000) return out;
   }
 }
+
+// Lançamentos do extrato sem realizado associado, limitados ao período coberto pelo realizado.
+export function extratoSemVinculo(extratos: Extrato[], porLanc: Map<string, Realizado[]>, realizados: Pick<Realizado, "data">[]) {
+  if (!realizados.length) return [];
+  const datas = realizados.map((r) => r.data).sort();
+  const de = datas[0]!, ate = datas[datas.length - 1]!;
+  return extratos.flatMap((e) => e.transacoes
+    .filter((t) => t.data >= de && t.data <= ate && !porLanc.has(chaveLanc(e.id, t)))
+    .map((t) => ({ ...t, banco: e.banco, conta: e.conta, extratoId: e.id })));
+}
+
+// Agrupa pendências por data com o saldo (entradas - saídas) de cada lado.
+export function pendenciasPorDia<R extends Pick<Realizado, "data" | "tipo" | "valor">, X extends Pick<Transacao, "data" | "tipo" | "valor">>(real: R[], ext: X[]) {
+  const datas = [...new Set([...real.map((r) => r.data), ...ext.map((t) => t.data)])].sort();
+  const c = (n: number) => Math.round(n * 100) / 100;
+  return datas.map((data) => {
+    const r = real.filter((x) => x.data === data), x = ext.filter((t) => t.data === data);
+    const saldoReal = c(r.reduce((a, i) => a + (i.tipo === "receber" ? i.valor : -i.valor), 0));
+    const saldoExt = c(x.reduce((a, i) => a + (i.tipo === "C" ? i.valor : -i.valor), 0));
+    return { data, real: r, ext: x, saldoReal, saldoExt, diferenca: c(saldoReal - saldoExt) };
+  });
+}
