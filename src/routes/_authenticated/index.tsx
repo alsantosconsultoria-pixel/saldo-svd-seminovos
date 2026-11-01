@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { categoria, parseLinhas, saldoDiario, type Extrato } from "@/lib/extrato/parser";
 import { deJSON, exportar, fmt, fmtData, useExtratos } from "@/lib/extrato/store";
 import { importarPrevisoes } from "@/lib/importar-previsoes";
-import { associar, carregarRealizados, importarRealizado, type Realizado } from "@/lib/realizado";
+import { associar, extratoSemVinculo, mesmaConta, carregarRealizados, importarRealizado, type Realizado } from "@/lib/realizado";
 import { PendenciasRealizado } from "@/components/PendenciasRealizado";
 import { SaldoDiario } from "@/components/SaldoDiario";
 import { TabelaLancamentos } from "@/components/TabelaLancamentos";
@@ -73,6 +73,7 @@ function Index() {
   const [relatorioPainel, setRelatorioPainel] = useState(false);
   const [aba, setAba] = useState("painel");
   const [lancDe, setLancDe] = useState("");
+  const [lancConta, setLancConta] = useState("todas");
   const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
   async function sair() {
@@ -108,10 +109,16 @@ function Index() {
   const totS = transacoes.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
 
   // lançamentos: filtro por período + totais do período filtrado
+  const noPeriodo = (d: string) => (!lancDe || d >= lancDe) && (!lancAte || d <= lancAte);
   const lancFiltrados = useMemo(
-    () => transacoes.filter((t) => (!lancDe || t.data >= lancDe) && (!lancAte || t.data <= lancAte)).sort((a, b) => a.data.localeCompare(b.data)),
-    [transacoes, lancDe, lancAte],
+    () => transacoes.filter((t) => noPeriodo(t.data) && (lancConta === "todas" || t.extratoId === lancConta)).sort((a, b) => a.data.localeCompare(b.data)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [transacoes, lancDe, lancAte, lancConta],
   );
+  const contaSel = lista.find((e) => e.id === lancConta);
+  const pendReal = associacao.pendentes.filter((r) => noPeriodo(r.data) && (!contaSel || mesmaConta(r.conta, contaSel)));
+  const pendExt = extratoSemVinculo(lista, associacao.porLanc, realizados)
+    .filter((t) => noPeriodo(t.data) && (!contaSel || t.extratoId === contaSel.id));
   const cats = useMemo(() => {
     const m = new Map<string, { cat: string; entradas: number; saidas: number }>();
     transacoes.forEach((t) => {
@@ -388,15 +395,22 @@ function Index() {
                   <label className="mb-1 block text-xs text-muted-foreground" htmlFor="lanc-ate">Até</label>
                   <Input id="lanc-ate" type="date" value={lancAte} onChange={(e) => setLancAte(e.target.value)} className="w-40" />
                 </div>
-                {(lancDe || lancAte) && (
-                  <Button variant="ghost" size="sm" onClick={() => { setLancDe(""); setLancAte(""); }}>Limpar filtro</Button>
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground" htmlFor="lanc-conta">Conta bancária</label>
+                  <select id="lanc-conta" value={lancConta} onChange={(e) => setLancConta(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                    <option value="todas">Todas as contas</option>
+                    {lista.map((e) => <option key={e.id} value={e.id}>{e.banco} · CC {e.conta}</option>)}
+                  </select>
+                </div>
+                {(lancDe || lancAte || lancConta !== "todas") && (
+                  <Button variant="ghost" size="sm" onClick={() => { setLancDe(""); setLancAte(""); setLancConta("todas"); }}>Limpar filtro</Button>
                 )}
                 <span className="ml-auto text-sm text-muted-foreground">{lancFiltrados.length} lançamentos</span>
               </div>
               <TabelaLancamentos itens={lancFiltrados} vinculos={associacao.porLanc} />
             </Card>
             <Card className="mt-4 p-5">
-              <PendenciasRealizado pendentes={associacao.pendentes} lista={lista} aoVincular={recarregarRealizados} />
+              <PendenciasRealizado pendentes={pendReal} extrato={pendExt} lista={lista} aoVincular={recarregarRealizados} />
             </Card>
           </TabsContent>
 
