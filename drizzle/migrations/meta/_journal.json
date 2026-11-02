@@ -50,6 +50,13 @@
       "when": 1793618860907,
       "tag": "0006_realizados_owner_read",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793621016454,
+      "tag": "0007_user_roles_admin",
+      "breakpoints": true
     }
   ]
 }
