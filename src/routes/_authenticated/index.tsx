@@ -22,6 +22,9 @@ import { Previsoes } from "@/components/Previsoes";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
+import { souAdmin } from "@/lib/admin.functions";
+import { AdminUsuarios } from "@/components/AdminUsuarios";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -76,6 +79,11 @@ function Index() {
   const [lancConta, setLancConta] = useState("todas");
   const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
+  const [painelDe, setPainelDe] = useState("");
+  const [painelAte, setPainelAte] = useState("");
+  const [composicao, setComposicao] = useState<{ titulo: string; itens: Realizado[] } | null>(null);
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { souAdmin().then((r) => setAdmin(r.admin)).catch(() => setAdmin(false)); }, []);
   async function sair() {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
@@ -101,9 +109,10 @@ function Index() {
 
   const transacoes = ativos.flatMap((e) => e.transacoes.map((t) => ({ ...t, banco: e.banco, conta: e.conta, extratoId: e.id })));
   // painel: saldo do último dia de cada extrato — nunca acumulado/somado entre dias
-  const saldoIni = ativos.reduce((a, e) => a + e.saldoInicial, 0);
+  const diaAntes = (d: string) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() - 1); return x.toISOString().slice(0, 10); };
+  const saldoIni = ativos.reduce((a, e) => a + (painelDe ? saldoNaData(e, diaAntes(painelDe))?.saldo ?? e.saldoInicial : e.saldoInicial), 0);
   const saldosAtuais = ativos.map(ultimoSaldoExtrato);
-  const saldoFim = saldosAtuais.reduce((a, s) => a + s.saldo, 0);
+  const saldoFim = painelAte ? ativos.reduce((a, e) => a + (saldoNaData(e, painelAte)?.saldo ?? 0), 0) : saldosAtuais.reduce((a, s) => a + s.saldo, 0);
   const saldoParcial = saldosAtuais.some((s) => s.parcial);
   const totE = transacoes.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const totS = transacoes.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
@@ -119,23 +128,27 @@ function Index() {
   const pendReal = associacao.pendentes.filter((r) => noPeriodo(r.data) && (!contaSel || mesmaConta(r.conta, contaSel)));
   const pendExt = extratoSemVinculo(lista, associacao.porLanc, realizados)
     .filter((t) => noPeriodo(t.data) && (!contaSel || t.extratoId === contaSel.id));
+  // painel: categorias e maiores lançamentos vêm da base do realizado, no período do filtro
+  const realPainel = useMemo(() => realizados.filter((r) => (!painelDe || r.data >= painelDe) && (!painelAte || r.data <= painelAte)), [realizados, painelDe, painelAte]);
+  const ultimoRealizado = realizados.reduce((m, r) => (r.data > m ? r.data : m), "");
   const cats = useMemo(() => {
     const m = new Map<string, { cat: string; entradas: number; saidas: number }>();
-    transacoes.forEach((t) => {
-      const c = categoria(t.descricao);
-      const r = m.get(c) ?? { cat: c, entradas: 0, saidas: 0 };
-      if (t.tipo === "C") r.entradas += t.valor; else r.saidas += t.valor;
-      m.set(c, r);
+    realPainel.forEach((r) => {
+      const c = r.categoria || "Sem categoria";
+      const x = m.get(c) ?? { cat: c, entradas: 0, saidas: 0 };
+      if (r.tipo === "receber") x.entradas += r.valor; else x.saidas += r.valor;
+      m.set(c, x);
     });
     return [...m.values()].sort((a, b) => b.saidas + b.entradas - (a.saidas + a.entradas));
-  }, [transacoes]);
+  }, [realPainel]);
 
   const hojeIso = new Date().toISOString().slice(0, 10);
   // futuros só aparecem enquanto a data prevista ainda não chegou; débitos só contam quando saem no extrato
   const futuros = ativos.flatMap((e) => (e.futuros ?? []).filter((t) => t.data > hojeIso).map((t) => ({ ...t, banco: e.banco })));
   const futReceber = futuros.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
-  const topSaidas = [...transacoes].filter((t) => t.tipo === "D").sort((a, b) => b.valor - a.valor).slice(0, 8);
+  const topReal = [...realPainel].filter((r) => r.tipo === "pagar").sort((a, b) => b.valor - a.valor).slice(0, 8);
+  const topSaidas = topReal.map((r) => ({ id: r.id, data: r.data, descricao: r.descricao, contraparte: r.contraparte, valor: r.valor, tipo: "D", banco: r.conta, conta: r.conta })) as unknown as Parameters<typeof RelatorioPainel>[0]["maioresSaidas"];
 
   async function importar(files: File[]) {
     if (!files?.length) return;
@@ -283,9 +296,15 @@ function Index() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-3 print:hidden">
+          <label className="text-xs text-muted-foreground">Data inicial<Input type="date" className="w-40 bg-card" value={painelDe} onChange={(e) => setPainelDe(e.target.value)} /></label>
+          <label className="text-xs text-muted-foreground">Data final<Input type="date" className="w-40 bg-card" value={painelAte} onChange={(e) => setPainelAte(e.target.value)} /></label>
+          {(painelDe || painelAte) && <Button variant="ghost" size="sm" onClick={() => { setPainelDe(""); setPainelAte(""); }}>Limpar período</Button>}
+          <p className="ml-auto text-sm">Último dia do realizado: <span className="num font-semibold">{ultimoRealizado ? fmtData(ultimoRealizado) : "sem planilha importada"}</span></p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Kpi titulo="Saldo inicial" valor={saldoIni} />
-          <Kpi titulo={saldoParcial ? "Saldo do último dia (inclui saldo parcial calculado)" : "Saldo final (último dia do extrato)"} valor={saldoFim} destaque />
+          <Kpi titulo={painelDe ? `Saldo inicial em ${fmtData(painelDe)}` : "Saldo inicial"} valor={saldoIni} />
+          <Kpi titulo={painelAte ? `Saldo final em ${fmtData(painelAte)}` : saldoParcial ? "Saldo do último dia (inclui saldo parcial calculado)" : "Saldo final (último dia do extrato)"} valor={saldoFim} destaque />
         </div>
 
         <Tabs value={aba} onValueChange={(valor) => { setAba(valor); setRelatorioPainel(false); }}>
@@ -296,9 +315,11 @@ function Index() {
             <TabsTrigger value="contas">Contas</TabsTrigger>
             <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>
             <TabsTrigger value="previsoes">Fluxo</TabsTrigger>
+            {admin && <TabsTrigger value="admin">Administração</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
+          {admin && <TabsContent value="admin"><AdminUsuarios /></TabsContent>}
           <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} realizados={realizados} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
@@ -340,35 +361,51 @@ function Index() {
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Por categoria</h3>
+                <h3 className="mb-3 font-semibold">Por categoria <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
                 <Table>
                   <TableHeader><TableRow><TableHead>Categoria</TableHead><TableHead className="text-right">Entradas</TableHead><TableHead className="text-right">Saídas</TableHead></TableRow></TableHeader>
                   <TableBody>
+                    {cats.length === 0 && <TableRow><TableCell colSpan={3} className="text-sm text-muted-foreground">Importe a planilha de realizado para ver as categorias.</TableCell></TableRow>}
                     {cats.map((c) => (
                       <TableRow key={c.cat}>
                         <TableCell>{c.cat}</TableCell>
-                        <TableCell className="num text-right text-credit">{c.entradas ? fmt(c.entradas) : "—"}</TableCell>
-                        <TableCell className="num text-right text-debit">{c.saidas ? fmt(c.saidas) : "—"}</TableCell>
+                        <TableCell className="num text-right text-credit">{c.entradas ? <button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: `${c.cat} · Entradas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "receber") })}>{fmt(c.entradas)}</button> : "—"}</TableCell>
+                        <TableCell className="num text-right text-debit">{c.saidas ? <button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: `${c.cat} · Saídas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "pagar") })}>{fmt(c.saidas)}</button> : "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </Card>
               <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Maiores saídas</h3>
+                <h3 className="mb-3 font-semibold">Maiores saídas <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
                 <Table>
                   <TableBody>
-                    {topSaidas.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="num text-xs text-muted-foreground">{fmtData(t.data)}</TableCell>
-                        <TableCell><div className="text-sm">{t.descricao}</div><div className="text-xs text-muted-foreground">{t.contraparte}</div></TableCell>
-                        <TableCell className="num text-right text-debit">{fmt(t.valor)}</TableCell>
+                    {topReal.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="num text-xs text-muted-foreground">{fmtData(r.data)}</TableCell>
+                        <TableCell><div className="text-sm">{r.contraparte || r.descricao}</div><div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell>
+                        <TableCell className="num text-right text-debit"><button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: "Lançamento", itens: [r] })}>{fmt(r.valor)}</button></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </Card>
             </div>
+            <Dialog open={!!composicao} onOpenChange={(o) => !o && setComposicao(null)}>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader><DialogTitle>{composicao?.titulo}</DialogTitle></DialogHeader>
+                <div className="max-h-[65vh] overflow-auto">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Data baixa</TableHead><TableHead>Cliente/Fornecedor</TableHead><TableHead>Descrição</TableHead><TableHead>Documento</TableHead><TableHead>Conta</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                    <TableBody>{composicao?.itens.map((r) => <TableRow key={r.id}>
+                      <TableCell className="num">{fmtData(r.data)}</TableCell><TableCell>{r.contraparte}</TableCell><TableCell className="text-sm">{r.descricao}<div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell><TableCell>{r.documento}</TableCell><TableCell className="text-xs">{r.conta}</TableCell>
+                      <TableCell className={`num text-right ${r.tipo === "pagar" ? "text-debit" : "text-credit"}`}>{fmt(r.valor)}</TableCell>
+                    </TableRow>)}</TableBody>
+                  </Table>
+                </div>
+                <p className="text-right text-sm font-semibold">Total: <span className="num">{fmt((composicao?.itens ?? []).reduce((a, r) => a + r.valor, 0))}</span></p>
+              </DialogContent>
+            </Dialog>
             {futuros.length > 0 && (
               <Card className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
                 <h3 className="font-semibold">Previsões futuras dos extratos</h3>
