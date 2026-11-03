@@ -36,3 +36,11 @@
 # Contas vencidas no relatório
 - [x] Títulos "pagar" vencidos entram junto das despesas do dia, marcados "não pago no vencimento" (tela e relatório da diretoria).
 - [x] Conferir na tela a listagem de vencidos na seleção manual de data; botão Hoje exclui vencidos anteriores.
+
+# Painel com o realizado e administração
+- [x] Último dia do realizado, filtro de período, categorias e maiores saídas pela planilha de realizado.
+- [x] Administradores criam usuários, ligam ou desligam a permissão de administrador e removem acessos.
+- [x] Cards "Por categoria" e "Maiores saídas" recolhidos: mostram só os saldos de entradas e saídas.
+- [x] Clique no saldo abre o detalhe (categorias, maiores saídas ou o lançamento), com botão Voltar.
+- [x] Conferir na tela com conta conectada: cards fechados, categorias, lançamento único e Voltar.
+- [ ] Conferir na tela a aba Administração com conta conectada (só aparece para administrador).
