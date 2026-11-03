@@ -22,6 +22,9 @@ import { Previsoes } from "@/components/Previsoes";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
+import { souAdmin } from "@/lib/admin.functions";
+import { AdminUsuarios } from "@/components/AdminUsuarios";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -76,6 +79,11 @@ function Index() {
   const [lancConta, setLancConta] = useState("todas");
   const [lancAte, setLancAte] = useState("");
   const relatorioRef = useRef<HTMLDivElement>(null);
+  const [painelDe, setPainelDe] = useState("");
+  const [painelAte, setPainelAte] = useState("");
+  const [composicao, setComposicao] = useState<{ titulo: string; itens: Realizado[] } | null>(null);
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { souAdmin().then((r) => setAdmin(r.admin)).catch(() => setAdmin(false)); }, []);
   async function sair() {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
@@ -101,9 +109,10 @@ function Index() {
 
   const transacoes = ativos.flatMap((e) => e.transacoes.map((t) => ({ ...t, banco: e.banco, conta: e.conta, extratoId: e.id })));
   // painel: saldo do último dia de cada extrato — nunca acumulado/somado entre dias
-  const saldoIni = ativos.reduce((a, e) => a + e.saldoInicial, 0);
+  const diaAntes = (d: string) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() - 1); return x.toISOString().slice(0, 10); };
+  const saldoIni = ativos.reduce((a, e) => a + (painelDe ? saldoNaData(e, diaAntes(painelDe))?.saldo ?? e.saldoInicial : e.saldoInicial), 0);
   const saldosAtuais = ativos.map(ultimoSaldoExtrato);
-  const saldoFim = saldosAtuais.reduce((a, s) => a + s.saldo, 0);
+  const saldoFim = painelAte ? ativos.reduce((a, e) => a + (saldoNaData(e, painelAte)?.saldo ?? 0), 0) : saldosAtuais.reduce((a, s) => a + s.saldo, 0);
   const saldoParcial = saldosAtuais.some((s) => s.parcial);
   const totE = transacoes.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const totS = transacoes.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
@@ -119,23 +128,27 @@ function Index() {
   const pendReal = associacao.pendentes.filter((r) => noPeriodo(r.data) && (!contaSel || mesmaConta(r.conta, contaSel)));
   const pendExt = extratoSemVinculo(lista, associacao.porLanc, realizados)
     .filter((t) => noPeriodo(t.data) && (!contaSel || t.extratoId === contaSel.id));
+  // painel: categorias e maiores lançamentos vêm da base do realizado, no período do filtro
+  const realPainel = useMemo(() => realizados.filter((r) => (!painelDe || r.data >= painelDe) && (!painelAte || r.data <= painelAte)), [realizados, painelDe, painelAte]);
+  const ultimoRealizado = realizados.reduce((m, r) => (r.data > m ? r.data : m), "");
   const cats = useMemo(() => {
     const m = new Map<string, { cat: string; entradas: number; saidas: number }>();
-    transacoes.forEach((t) => {
-      const c = categoria(t.descricao);
-      const r = m.get(c) ?? { cat: c, entradas: 0, saidas: 0 };
-      if (t.tipo === "C") r.entradas += t.valor; else r.saidas += t.valor;
-      m.set(c, r);
+    realPainel.forEach((r) => {
+      const c = r.categoria || "Sem categoria";
+      const x = m.get(c) ?? { cat: c, entradas: 0, saidas: 0 };
+      if (r.tipo === "receber") x.entradas += r.valor; else x.saidas += r.valor;
+      m.set(c, x);
     });
     return [...m.values()].sort((a, b) => b.saidas + b.entradas - (a.saidas + a.entradas));
-  }, [transacoes]);
+  }, [realPainel]);
 
   const hojeIso = new Date().toISOString().slice(0, 10);
   // futuros só aparecem enquanto a data prevista ainda não chegou; débitos só contam quando saem no extrato
   const futuros = ativos.flatMap((e) => (e.futuros ?? []).filter((t) => t.data > hojeIso).map((t) => ({ ...t, banco: e.banco })));
   const futReceber = futuros.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
-  const topSaidas = [...transacoes].filter((t) => t.tipo === "D").sort((a, b) => b.valor - a.valor).slice(0, 8);
+  const topReal = [...realPainel].filter((r) => r.tipo === "pagar").sort((a, b) => b.valor - a.valor).slice(0, 8);
+  const topSaidas = topReal.map((r) => ({ id: r.id, data: r.data, descricao: r.descricao, contraparte: r.contraparte, valor: r.valor, tipo: "D", banco: r.conta, conta: r.conta })) as unknown as Parameters<typeof RelatorioPainel>[0]["maioresSaidas"];
 
   async function importar(files: File[]) {
     if (!files?.length) return;
