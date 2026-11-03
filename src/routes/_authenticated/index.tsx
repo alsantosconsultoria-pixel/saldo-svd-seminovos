@@ -296,9 +296,15 @@ function Index() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-3 print:hidden">
+          <label className="text-xs text-muted-foreground">Data inicial<Input type="date" className="w-40 bg-card" value={painelDe} onChange={(e) => setPainelDe(e.target.value)} /></label>
+          <label className="text-xs text-muted-foreground">Data final<Input type="date" className="w-40 bg-card" value={painelAte} onChange={(e) => setPainelAte(e.target.value)} /></label>
+          {(painelDe || painelAte) && <Button variant="ghost" size="sm" onClick={() => { setPainelDe(""); setPainelAte(""); }}>Limpar período</Button>}
+          <p className="ml-auto text-sm">Último dia do realizado: <span className="num font-semibold">{ultimoRealizado ? fmtData(ultimoRealizado) : "sem planilha importada"}</span></p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Kpi titulo="Saldo inicial" valor={saldoIni} />
-          <Kpi titulo={saldoParcial ? "Saldo do último dia (inclui saldo parcial calculado)" : "Saldo final (último dia do extrato)"} valor={saldoFim} destaque />
+          <Kpi titulo={painelDe ? `Saldo inicial em ${fmtData(painelDe)}` : "Saldo inicial"} valor={saldoIni} />
+          <Kpi titulo={painelAte ? `Saldo final em ${fmtData(painelAte)}` : saldoParcial ? "Saldo do último dia (inclui saldo parcial calculado)" : "Saldo final (último dia do extrato)"} valor={saldoFim} destaque />
         </div>
 
         <Tabs value={aba} onValueChange={(valor) => { setAba(valor); setRelatorioPainel(false); }}>
@@ -309,6 +315,7 @@ function Index() {
             <TabsTrigger value="contas">Contas</TabsTrigger>
             <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>
             <TabsTrigger value="previsoes">Fluxo</TabsTrigger>
+            {admin && <TabsTrigger value="admin">Administração</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
@@ -353,35 +360,51 @@ function Index() {
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Por categoria</h3>
+                <h3 className="mb-3 font-semibold">Por categoria <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
                 <Table>
                   <TableHeader><TableRow><TableHead>Categoria</TableHead><TableHead className="text-right">Entradas</TableHead><TableHead className="text-right">Saídas</TableHead></TableRow></TableHeader>
                   <TableBody>
+                    {cats.length === 0 && <TableRow><TableCell colSpan={3} className="text-sm text-muted-foreground">Importe a planilha de realizado para ver as categorias.</TableCell></TableRow>}
                     {cats.map((c) => (
                       <TableRow key={c.cat}>
                         <TableCell>{c.cat}</TableCell>
-                        <TableCell className="num text-right text-credit">{c.entradas ? fmt(c.entradas) : "—"}</TableCell>
-                        <TableCell className="num text-right text-debit">{c.saidas ? fmt(c.saidas) : "—"}</TableCell>
+                        <TableCell className="num text-right text-credit">{c.entradas ? <button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: `${c.cat} · Entradas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "receber") })}>{fmt(c.entradas)}</button> : "—"}</TableCell>
+                        <TableCell className="num text-right text-debit">{c.saidas ? <button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: `${c.cat} · Saídas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "pagar") })}>{fmt(c.saidas)}</button> : "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </Card>
               <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Maiores saídas</h3>
+                <h3 className="mb-3 font-semibold">Maiores saídas <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
                 <Table>
                   <TableBody>
-                    {topSaidas.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="num text-xs text-muted-foreground">{fmtData(t.data)}</TableCell>
-                        <TableCell><div className="text-sm">{t.descricao}</div><div className="text-xs text-muted-foreground">{t.contraparte}</div></TableCell>
-                        <TableCell className="num text-right text-debit">{fmt(t.valor)}</TableCell>
+                    {topReal.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="num text-xs text-muted-foreground">{fmtData(r.data)}</TableCell>
+                        <TableCell><div className="text-sm">{r.contraparte || r.descricao}</div><div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell>
+                        <TableCell className="num text-right text-debit"><button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: "Lançamento", itens: [r] })}>{fmt(r.valor)}</button></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </Card>
             </div>
+            <Dialog open={!!composicao} onOpenChange={(o) => !o && setComposicao(null)}>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader><DialogTitle>{composicao?.titulo}</DialogTitle></DialogHeader>
+                <div className="max-h-[65vh] overflow-auto">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Data baixa</TableHead><TableHead>Cliente/Fornecedor</TableHead><TableHead>Descrição</TableHead><TableHead>Documento</TableHead><TableHead>Conta</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                    <TableBody>{composicao?.itens.map((r) => <TableRow key={r.id}>
+                      <TableCell className="num">{fmtData(r.data)}</TableCell><TableCell>{r.contraparte}</TableCell><TableCell className="text-sm">{r.descricao}<div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell><TableCell>{r.documento}</TableCell><TableCell className="text-xs">{r.conta}</TableCell>
+                      <TableCell className={`num text-right ${r.tipo === "pagar" ? "text-debit" : "text-credit"}`}>{fmt(r.valor)}</TableCell>
+                    </TableRow>)}</TableBody>
+                  </Table>
+                </div>
+                <p className="text-right text-sm font-semibold">Total: <span className="num">{fmt((composicao?.itens ?? []).reduce((a, r) => a + r.valor, 0))}</span></p>
+              </DialogContent>
+            </Dialog>
             {futuros.length > 0 && (
               <Card className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
                 <h3 className="font-semibold">Previsões futuras dos extratos</h3>
