@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, RotateCcw, Printer, LogOut, FileText, FileSpreadsheet } from "lucide-react";
+import { Upload, Download, Trash2, RotateCcw, Printer, LogOut, FileText, FileSpreadsheet, ChevronRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,6 +42,12 @@ export const Route = createFileRoute("/_authenticated/")({
 
 const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.conta}`;
 
+// Painel: primeiro os saldos; o clique abre o detalhe (categorias, maiores saídas ou um lançamento).
+type VistaPainel =
+  | { tipo: "categorias" }
+  | { tipo: "maiores" }
+  | { tipo: "composicao"; titulo: string; itens: Realizado[]; volta: "categorias" | "maiores" };
+
 function Index() {
   const { lista, add, remove, reset } = useExtratos();
   const navigate = useNavigate();
@@ -81,7 +87,7 @@ function Index() {
   const relatorioRef = useRef<HTMLDivElement>(null);
   const [painelDe, setPainelDe] = useState("");
   const [painelAte, setPainelAte] = useState("");
-  const [composicao, setComposicao] = useState<{ titulo: string; itens: Realizado[] } | null>(null);
+  const [vista, setVista] = useState<VistaPainel | null>(null);
   const [admin, setAdmin] = useState(false);
   useEffect(() => { souAdmin().then((r) => setAdmin(r.admin)).catch(() => setAdmin(false)); }, []);
   async function sair() {
@@ -149,6 +155,9 @@ function Index() {
   const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
   const topReal = [...realPainel].filter((r) => r.tipo === "pagar").sort((a, b) => b.valor - a.valor).slice(0, 8);
   const topSaidas = topReal.map((r) => ({ id: r.id, data: r.data, descricao: r.descricao, contraparte: r.contraparte, valor: r.valor, tipo: "D", banco: r.conta, conta: r.conta })) as unknown as Parameters<typeof RelatorioPainel>[0]["maioresSaidas"];
+  const catEntradas = cats.reduce((a, c) => a + c.entradas, 0);
+  const catSaidas = cats.reduce((a, c) => a + c.saidas, 0);
+  const topTotal = topReal.reduce((a, r) => a + r.valor, 0);
 
   async function importar(files: File[]) {
     if (!files?.length) return;
@@ -362,48 +371,91 @@ function Index() {
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
                 <h3 className="mb-3 font-semibold">Por categoria <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
-                <Table>
-                  <TableHeader><TableRow><TableHead>Categoria</TableHead><TableHead className="text-right">Entradas</TableHead><TableHead className="text-right">Saídas</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {cats.length === 0 && <TableRow><TableCell colSpan={3} className="text-sm text-muted-foreground">Importe a planilha de realizado para ver as categorias.</TableCell></TableRow>}
-                    {cats.map((c) => (
-                      <TableRow key={c.cat}>
-                        <TableCell>{c.cat}</TableCell>
-                        <TableCell className="num text-right text-credit">{c.entradas ? <button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: `${c.cat} · Entradas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "receber") })}>{fmt(c.entradas)}</button> : "—"}</TableCell>
-                        <TableCell className="num text-right text-debit">{c.saidas ? <button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: `${c.cat} · Saídas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "pagar") })}>{fmt(c.saidas)}</button> : "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                {cats.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Importe a planilha de realizado para ver as categorias.</p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button className="rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary hover:bg-muted" onClick={() => setVista({ tipo: "categorias" })}>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">Entradas</p>
+                      <p className="num mt-1 text-2xl font-semibold text-credit">{fmt(catEntradas)}</p>
+                      <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">Abrir categorias <ChevronRight className="size-3" /></p>
+                    </button>
+                    <button className="rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary hover:bg-muted" onClick={() => setVista({ tipo: "categorias" })}>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">Saídas</p>
+                      <p className="num mt-1 text-2xl font-semibold text-debit">{fmt(catSaidas)}</p>
+                      <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">Abrir categorias <ChevronRight className="size-3" /></p>
+                    </button>
+                  </div>
+                )}
               </Card>
               <Card className="p-5">
                 <h3 className="mb-3 font-semibold">Maiores saídas <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
-                <Table>
-                  <TableBody>
-                    {topReal.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="num text-xs text-muted-foreground">{fmtData(r.data)}</TableCell>
-                        <TableCell><div className="text-sm">{r.contraparte || r.descricao}</div><div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell>
-                        <TableCell className="num text-right text-debit"><button className="underline-offset-2 hover:underline" onClick={() => setComposicao({ titulo: "Lançamento", itens: [r] })}>{fmt(r.valor)}</button></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                {topReal.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Importe a planilha de realizado para ver as maiores saídas.</p>
+                ) : (
+                  <button className="w-full rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary hover:bg-muted" onClick={() => setVista({ tipo: "maiores" })}>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Total das {topReal.length} maiores saídas</p>
+                    <p className="num mt-1 text-2xl font-semibold text-debit">{fmt(topTotal)}</p>
+                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">Abrir detalhe <ChevronRight className="size-3" /></p>
+                  </button>
+                )}
               </Card>
             </div>
-            <Dialog open={!!composicao} onOpenChange={(o) => !o && setComposicao(null)}>
+            <Dialog open={!!vista} onOpenChange={(o) => !o && setVista(null)}>
               <DialogContent className="max-w-4xl">
-                <DialogHeader><DialogTitle>{composicao?.titulo}</DialogTitle></DialogHeader>
-                <div className="max-h-[65vh] overflow-auto">
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Data baixa</TableHead><TableHead>Cliente/Fornecedor</TableHead><TableHead>Descrição</TableHead><TableHead>Documento</TableHead><TableHead>Conta</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
-                    <TableBody>{composicao?.itens.map((r) => <TableRow key={r.id}>
-                      <TableCell className="num">{fmtData(r.data)}</TableCell><TableCell>{r.contraparte}</TableCell><TableCell className="text-sm">{r.descricao}<div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell><TableCell>{r.documento}</TableCell><TableCell className="text-xs">{r.conta}</TableCell>
-                      <TableCell className={`num text-right ${r.tipo === "pagar" ? "text-debit" : "text-credit"}`}>{fmt(r.valor)}</TableCell>
-                    </TableRow>)}</TableBody>
-                  </Table>
-                </div>
-                <p className="text-right text-sm font-semibold">Total: <span className="num">{fmt((composicao?.itens ?? []).reduce((a, r) => a + r.valor, 0))}</span></p>
+                <DialogHeader>
+                  <DialogTitle>{vista?.tipo === "categorias" ? "Composição por categoria" : vista?.tipo === "maiores" ? "Maiores saídas do período" : vista?.titulo}</DialogTitle>
+                </DialogHeader>
+                {vista?.tipo === "categorias" && (
+                  <div className="max-h-[65vh] overflow-auto">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Categoria</TableHead><TableHead className="text-right">Entradas</TableHead><TableHead className="text-right">Saídas</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {cats.map((c) => (
+                          <TableRow key={c.cat}>
+                            <TableCell>{c.cat}</TableCell>
+                            <TableCell className="num text-right text-credit">{c.entradas ? <button className="underline-offset-2 hover:underline" onClick={() => setVista({ tipo: "composicao", titulo: `${c.cat} · Entradas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "receber"), volta: "categorias" })}>{fmt(c.entradas)}</button> : "—"}</TableCell>
+                            <TableCell className="num text-right text-debit">{c.saidas ? <button className="underline-offset-2 hover:underline" onClick={() => setVista({ tipo: "composicao", titulo: `${c.cat} · Saídas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "pagar"), volta: "categorias" })}>{fmt(c.saidas)}</button> : "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <p className="mt-3 text-right text-sm font-semibold">Entradas: <span className="num text-credit">{fmt(catEntradas)}</span> · Saídas: <span className="num text-debit">{fmt(catSaidas)}</span></p>
+                  </div>
+                )}
+                {vista?.tipo === "maiores" && (
+                  <div className="max-h-[65vh] overflow-auto">
+                    <Table>
+                      <TableBody>
+                        {topReal.map((r) => (
+                          <TableRow key={r.id}>
+                            <TableCell className="num text-xs text-muted-foreground">{fmtData(r.data)}</TableCell>
+                            <TableCell><div className="text-sm">{r.contraparte || r.descricao}</div><div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell>
+                            <TableCell className="num text-right text-debit"><button className="underline-offset-2 hover:underline" onClick={() => setVista({ tipo: "composicao", titulo: "Lançamento", itens: [r], volta: "maiores" })}>{fmt(r.valor)}</button></TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <p className="mt-3 text-right text-sm font-semibold">Total: <span className="num">{fmt(topTotal)}</span></p>
+                  </div>
+                )}
+                {vista && vista.tipo === "composicao" && (
+                  <>
+                    <div className="max-h-[65vh] overflow-auto">
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Data baixa</TableHead><TableHead>Cliente/Fornecedor</TableHead><TableHead>Descrição</TableHead><TableHead>Documento</TableHead><TableHead>Conta</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                        <TableBody>{vista.itens.map((r) => <TableRow key={r.id}>
+                          <TableCell className="num">{fmtData(r.data)}</TableCell><TableCell>{r.contraparte}</TableCell><TableCell className="text-sm">{r.descricao}<div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell><TableCell>{r.documento}</TableCell><TableCell className="text-xs">{r.conta}</TableCell>
+                          <TableCell className={`num text-right ${r.tipo === "pagar" ? "text-debit" : "text-credit"}`}>{fmt(r.valor)}</TableCell>
+                        </TableRow>)}</TableBody>
+                      </Table>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <Button variant="ghost" size="sm" onClick={() => setVista({ tipo: vista.volta })}><ArrowLeft /> Voltar</Button>
+                      <p className="text-sm font-semibold">Total: <span className="num">{fmt(vista.itens.reduce((a, r) => a + r.valor, 0))}</span></p>
+                    </div>
+                  </>
+                )}
               </DialogContent>
             </Dialog>
             {futuros.length > 0 && (
