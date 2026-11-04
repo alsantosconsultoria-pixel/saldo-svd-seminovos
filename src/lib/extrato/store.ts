@@ -3,7 +3,7 @@ import type { Extrato, Tipo } from "./parser";
 import seed from "./seed.json";
 import { supabase } from "@/integrations/supabase/client";
 
-const KEY = "extratos-v2";
+export const KEY = "extratos-v2";
 const demo = seed as unknown as Extrato[];
 
 // Extratos sincronizados na nuvem (Lovable Cloud): qualquer dispositivo com
