@@ -72,3 +72,44 @@ export const removerUsuario = createServerFn({ method: "POST" })
     if (error) throw new Error("Não foi possível remover o usuário.");
     return { ok: true };
   });
+
+// ===== Limpeza de dados (somente administradores) =====
+export const GRUPOS = ["extratos", "previsoes", "realizados", "transferencias", "demonstrativos"] as const;
+export type Grupo = (typeof GRUPOS)[number];
+
+// aceita apenas grupos conhecidos; nada conhecido = nada a apagar
+export function validarGrupos(d: { grupos?: unknown }): { grupos: Grupo[] } {
+  const bruto = Array.isArray(d?.grupos) ? d.grupos : [];
+  const grupos = bruto.filter((g): g is Grupo => (GRUPOS as readonly string[]).includes(g as Grupo));
+  if (!grupos.length) throw new Error("Escolha o que deseja apagar.");
+  return { grupos };
+}
+
+export const contarDados = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await exigirAdmin(context as unknown as Ctx);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const totais: Record<string, number> = {};
+    for (const g of GRUPOS) {
+      const { count } = await supabaseAdmin.from(g).select("id", { count: "exact", head: true });
+      totais[g] = count ?? 0;
+    }
+    return totais;
+  });
+
+export const limparDados = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validarGrupos)
+  .handler(async ({ context, data }) => {
+    await exigirAdmin(context as unknown as Ctx);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const apagados: Record<string, number> = {};
+    for (const g of data.grupos) {
+      const { count } = await supabaseAdmin.from(g).select("id", { count: "exact", head: true });
+      const { error } = await supabaseAdmin.from(g).delete().not("id", "is", null);
+      if (error) throw new Error(`Não foi possível apagar os dados de ${g}.`);
+      apagados[g] = count ?? 0;
+    }
+    return { apagados };
+  });
