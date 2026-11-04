@@ -24,6 +24,7 @@ import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { souAdmin } from "@/lib/admin.functions";
 import { AdminUsuarios } from "@/components/AdminUsuarios";
+import { MinhaSenha } from "@/components/MinhaSenha";
 import { AdminDados } from "@/components/AdminDados";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -284,6 +285,7 @@ function Index() {
             <input ref={inputRealizado} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => importarRealizadoArquivo(e.target.files)} />
             <Button variant="secondary" onClick={() => inputRealizado.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar realizado</Button>
             <Button variant="secondary" onClick={() => window.print()}><Printer /> Imprimir</Button>
+            <MinhaSenha />
             <Button variant="secondary" onClick={sair}><LogOut /> Sair</Button>
           </div>
         </div>

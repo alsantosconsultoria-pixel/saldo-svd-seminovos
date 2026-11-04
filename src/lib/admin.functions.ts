@@ -113,3 +113,17 @@ export const limparDados = createServerFn({ method: "POST" })
     }
     return { apagados };
   });
+
+export const definirSenha = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; senha: string }) => {
+    if (String(d.senha).length < 8) throw new Error("A senha precisa ter pelo menos 8 caracteres.");
+    return { userId: String(d.userId), senha: String(d.senha) };
+  })
+  .handler(async ({ context, data }) => {
+    await exigirAdmin(context as unknown as Ctx);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, { password: data.senha });
+    if (error) throw new Error("Não foi possível alterar a senha.");
+    return { ok: true };
+  });
