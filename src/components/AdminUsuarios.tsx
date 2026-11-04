@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { KeyRound, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { criarUsuario, definirAdmin, listarUsuarios, removerUsuario } from "@/lib/admin.functions";
+import { criarUsuario, definirAdmin, definirSenha, listarUsuarios, removerUsuario } from "@/lib/admin.functions";
 
 type Usuario = Awaited<ReturnType<typeof listarUsuarios>>[number];
 const dt = (s: string | null) => (s ? new Date(s).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Nunca");
@@ -26,6 +26,11 @@ export function AdminUsuarios() {
   }
   async function alternar(u: Usuario, admin: boolean) {
     try { await definirAdmin({ data: { userId: u.id, admin } }); carregar(); } catch (e) { toast.error(msg(e)); }
+  }
+  async function novaSenha(u: Usuario) {
+    const senha = prompt(`Nova senha para ${u.email} (mínimo 8 caracteres):`);
+    if (!senha) return;
+    try { await definirSenha({ data: { userId: u.id, senha } }); toast.success("Senha alterada. Informe a nova senha ao usuário."); } catch (e) { toast.error(msg(e)); }
   }
   async function remover(u: Usuario) {
     if (!confirm(`Remover o acesso de ${u.email}?`)) return;
@@ -51,7 +56,7 @@ export function AdminUsuarios() {
           <TableCell className="text-sm">{dt(u.criado)}</TableCell>
           <TableCell className="text-sm">{dt(u.ultimoAcesso)}</TableCell>
           <TableCell><Switch checked={u.admin} disabled={u.voce} onCheckedChange={(v) => alternar(u, v)} /></TableCell>
-          <TableCell className="text-right">{!u.voce && <Button variant="ghost" size="sm" onClick={() => remover(u)}><Trash2 /> Remover</Button>}</TableCell>
+          <TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => novaSenha(u)}><KeyRound /> Nova senha</Button>{!u.voce && <Button variant="ghost" size="sm" onClick={() => remover(u)}><Trash2 /> Remover</Button>}</TableCell>
         </TableRow>)}</TableBody>
       </Table>
       <p className="mt-3 text-xs text-muted-foreground">Administradores gerenciam usuários e permissões. Os demais usam o painel normalmente.</p>
