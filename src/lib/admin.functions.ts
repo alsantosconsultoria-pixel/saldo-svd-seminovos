@@ -77,6 +77,14 @@ export const removerUsuario = createServerFn({ method: "POST" })
 export const GRUPOS = ["extratos", "previsoes", "realizados", "transferencias", "demonstrativos"] as const;
 export type Grupo = (typeof GRUPOS)[number];
 
+// aceita apenas grupos conhecidos; nada conhecido = nada a apagar
+export function validarGrupos(d: { grupos?: unknown }): { grupos: Grupo[] } {
+  const bruto = Array.isArray(d?.grupos) ? d.grupos : [];
+  const grupos = bruto.filter((g): g is Grupo => (GRUPOS as readonly string[]).includes(g as Grupo));
+  if (!grupos.length) throw new Error("Escolha o que deseja apagar.");
+  return { grupos };
+}
+
 export const contarDados = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
