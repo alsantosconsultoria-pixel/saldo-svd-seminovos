@@ -100,11 +100,7 @@ export const contarDados = createServerFn({ method: "GET" })
 
 export const limparDados = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { grupos: string[] }) => {
-    const grupos = (Array.isArray(d?.grupos) ? d.grupos : []).filter((g): g is Grupo => (GRUPOS as readonly string[]).includes(g));
-    if (!grupos.length) throw new Error("Escolha o que deseja apagar.");
-    return { grupos };
-  })
+  .inputValidator(validarGrupos)
   .handler(async ({ context, data }) => {
     await exigirAdmin(context as unknown as Ctx);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

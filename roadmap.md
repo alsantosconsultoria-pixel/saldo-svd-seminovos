@@ -43,4 +43,9 @@
 - [x] Cards "Por categoria" e "Maiores saídas" recolhidos: mostram só os saldos de entradas e saídas.
 - [x] Clique no saldo abre o detalhe (categorias, maiores saídas ou o lançamento), com botão Voltar.
 - [x] Conferir na tela com conta conectada: cards fechados, categorias, lançamento único e Voltar.
-- [ ] Conferir na tela a aba Administração com conta conectada (só aparece para administrador).
+- [x] Conferir na tela a aba Administração com conta conectada (só aparece para administrador).
+
+# Limpeza de dados na administração
+- [x] Botão de limpar dados de volta, dentro da aba Administração, grupo a grupo e com "Limpar tudo" confirmado por digitação.
+- [x] Testar a seleção do que pode ser apagado (grupos conhecidos, nada escolhido).
+- [x] Conferir na tela com conta conectada: contagens por grupo, botões habilitados e trava do "Apagar tudo".
