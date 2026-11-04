@@ -102,7 +102,8 @@ export const limparDados = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const apagados: Record<string, number> = {};
     for (const g of data.grupos) {
-      const { count, error } = await supabaseAdmin.from(g).delete().not("id", "is", null).select("id", { count: "exact" });
+      const { count } = await supabaseAdmin.from(g).select("id", { count: "exact", head: true });
+      const { error } = await supabaseAdmin.from(g).delete().not("id", "is", null);
       if (error) throw new Error(`Não foi possível apagar os dados de ${g}.`);
       apagados[g] = count ?? 0;
     }
