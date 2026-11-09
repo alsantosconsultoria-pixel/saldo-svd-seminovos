@@ -225,8 +225,8 @@ function RealizadoLinha({ realizados, de, ate }: { realizados: Realizado[]; de: 
     <div className="overflow-x-auto"><table className="w-full border-collapse text-sm">
       <thead><tr className="border-b bg-muted/40"><th className={rot + " bg-muted"}>Data</th>{dias.map((d) => <th key={d.data} className={cel + " font-semibold"}>{fmtData(d.data).slice(0, 5)}</th>)}</tr></thead>
       <tbody>
-        <tr className="border-b"><td className={rot}>Despesa paga</td>{dias.map((d) => <td key={d.data} className={cel}>{link(d.data, "pagar", d.pago, "text-debit")}</td>)}</tr>
-        <tr className="border-b"><td className={rot}>Receita recebida</td>{dias.map((d) => <td key={d.data} className={cel}>{link(d.data, "receber", d.recebido, "text-credit")}</td>)}</tr>
+        <tr className="border-b"><td className={rot}>Despesa</td>{dias.map((d) => <td key={d.data} className={cel}>{link(d.data, "pagar", d.pago, "text-debit")}</td>)}</tr>
+        <tr className="border-b"><td className={rot}>Receita</td>{dias.map((d) => <td key={d.data} className={cel}>{link(d.data, "receber", d.recebido, "text-credit")}</td>)}</tr>
         <tr className="bg-muted/30 font-semibold"><td className={rot + " bg-muted"}>Total do dia</td>{dias.map((d) => <td key={d.data} className={`${cel} ${d.recebido - d.pago < 0 ? "text-debit" : ""}`}>{n(d.recebido - d.pago)}</td>)}</tr>
       </tbody>
     </table></div>
