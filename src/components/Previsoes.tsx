@@ -61,6 +61,9 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
   const periodo = useMemo(() => (ate >= ini ? fluxoPeriodo(fluxo, saldoBancos, ini, ate) : []), [fluxo, saldoBancos, ini, ate]);
   const criticos = periodo.filter((d) => d.faltante > 0);
   const plano = useMemo(() => fluxoPorPlano(itens, periodo.map((d) => d.data), contas, mapa, dia), [itens, periodo, contas, mapa, dia]);
+  const [abertosReal, setAbertosReal] = useState<Set<string>>(new Set());
+  const diasReal = useMemo(() => realizadoPorDia(realizados, de, ate).map((d) => ({ data: d.data, inicial: 0, receber: 0, pagar: 0, final: 0, faltante: 0 })), [realizados, de, ate]);
+  const planoReal = useMemo(() => fluxoPorPlano(realizados.map((r) => ({ tipo: r.tipo, vencimento: r.data, categoria: r.categoria, valor: r.valor })), diasReal.map((d) => d.data), contas, mapa, ""), [realizados, diasReal, contas, mapa]);
   const tituloRel = periodo.length ? `Fluxo de caixa previsto · ${fmtData(periodo[0]!.data)} a ${fmtData(periodo.at(-1)!.data)}` : "";
   const noPeriodo = (i: Prev) => { const v = i.vencimento < dia ? dia : i.vencimento; return v >= ini && v <= ate; };
   const rec = itens.filter((i) => i.tipo === "receber" && noPeriodo(i));
@@ -122,6 +125,8 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
 
       <Card className="p-5">
         <h3 className="mb-3 font-semibold">Realizado por data</h3>
+        {diasReal.length > 0 && <div className="mb-4"><FluxoPlano linhas={planoReal} periodo={diasReal} abertos={abertosReal} setAbertos={setAbertosReal} semSaldo /></div>}
+        <h4 className="mb-2 text-sm font-medium text-muted-foreground">Composição por dia (clique no valor)</h4>
         <RealizadoLinha realizados={realizados} de={de} ate={ate} />
       </Card>
 
