@@ -57,6 +57,13 @@
       "when": 1793621016454,
       "tag": "0007_user_roles_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794232710718,
+      "tag": "0008_plano_financeiro",
+      "breakpoints": true
     }
   ]
 }
