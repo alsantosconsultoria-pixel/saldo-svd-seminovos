@@ -29,9 +29,9 @@ export function AdminPlano() {
   useEffect(() => { carregar(); }, []);
 
   async function criar() {
-    if (!nova.codigo.trim() || !nova.nome.trim()) return toast.error("Informe o número e o nome da conta.");
+    if (!nova.codigo.trim() || !nova.nome.trim()) { toast.error("Informe o número e o nome da conta."); return; }
     const { error } = await supabase.from("plano_contas").insert({ codigo: nova.codigo.trim(), nome: nova.nome.trim(), tipo: nova.tipo });
-    if (error) return toast.error(error.code === "23505" ? "Já existe uma conta com esse número." : error.message);
+    if (error) { toast.error(error.code === "23505" ? "Já existe uma conta com esse número." : error.message); return; }
     setNova({ ...nova, codigo: "", nome: "" }); carregar();
   }
   async function remover(c: ContaPlano) {
@@ -42,7 +42,7 @@ export function AdminPlano() {
     const { error } = conta
       ? await supabase.from("plano_categorias").upsert({ categoria, conta_id: conta })
       : await supabase.from("plano_categorias").delete().eq("categoria", categoria);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setMapa((m) => { const n = { ...m }; if (conta) n[categoria] = conta; else delete n[categoria]; return n; });
   }
 

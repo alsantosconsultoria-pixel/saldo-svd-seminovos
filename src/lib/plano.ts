@@ -20,7 +20,7 @@ export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaP
       const conta = porId.has(mapa[cat] ?? "") ? mapa[cat]! : "_sem";
       const cats = contasMap.get(conta) ?? new Map<string, number[]>();
       const v = cats.get(cat) ?? dias.map(() => 0);
-      v[d] += cent(i.valor);
+      v[d] = (v[d] ?? 0) + cent(i.valor);
       cats.set(cat, v); contasMap.set(conta, cats);
     }
     const filhos = [...contasMap.entries()].map(([cid, cats]) => {
@@ -34,7 +34,7 @@ export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaP
 
 function soma(l: { cent: number[] }[], n: number) {
   const v = Array.from({ length: n }, () => 0);
-  for (const x of l) x.cent.forEach((c, i) => (v[i] += c));
+  for (const x of l) x.cent.forEach((c, i) => (v[i] = (v[i] ?? 0) + c));
   return v;
 }
 function linha(id: string, rotulo: string, c: number[], filhos: (LinhaPlano & { cent: number[] })[], ordem = "") {

@@ -169,24 +169,6 @@ function Curva({ periodo }: { periodo: DiaFluxo[] }) {
   </ResponsiveContainer></div>;
 }
 
-function FluxoLinha({ periodo }: { periodo: DiaFluxo[] }) {
-  const n = (v: number) => fmt(v).replace("R$", "").trim();
-  const cel = "num whitespace-nowrap border-l px-3 py-2 text-right";
-  const rot = "sticky left-0 z-10 whitespace-nowrap bg-card px-3 py-2 text-left font-medium";
-  return <div className="overflow-x-auto">
-    <table className="w-full border-collapse text-sm">
-      <thead><tr className="border-b bg-muted/40"><th className={rot + " bg-muted"}>Data</th>{periodo.map((d) => <th key={d.data} className={cel + " font-semibold"}>{fmtData(d.data).slice(0, 5)}</th>)}</tr></thead>
-      <tbody>
-        <tr className="border-b"><td className={rot}>Saldo inicial</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.inicial < 0 ? "text-debit" : ""}`}>{n(d.inicial)}</td>)}</tr>
-        <tr className="border-b"><td className={rot}>A receber</td>{periodo.map((d) => <td key={d.data} className={`${cel} text-credit`}>{d.receber ? n(d.receber) : "—"}</td>)}</tr>
-        <tr className="border-b"><td className={rot}>A pagar</td>{periodo.map((d) => <td key={d.data} className={`${cel} text-debit`}>{d.pagar ? n(d.pagar) : "—"}</td>)}</tr>
-        <tr className="border-b"><td className={rot}>Total do dia</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.receber - d.pagar < 0 ? "text-debit" : ""}`}>{n(d.receber - d.pagar)}</td>)}</tr>
-        <tr className="border-b-2 border-foreground/30 bg-muted/30 font-semibold"><td className={rot + " bg-muted"}>Previsão de saldo</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.final < 0 ? "bg-destructive/10 text-debit" : ""}`}>{n(d.final)}</td>)}</tr>
-        <tr><td className={rot}>Falta para pagar</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.faltante ? "font-semibold text-debit" : "text-muted-foreground"}`}>{d.faltante ? n(d.faltante) : "—"}</td>)}</tr>
-      </tbody>
-    </table>
-  </div>;
-}
 
 function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, plano, abertos, setAbertos }: { periodo: DiaFluxo[]; saldoBancos: number; base: string; receber: number; pagar: number; maiores: Prev[]; plano: LinhaPlano[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void }) {
   const final = periodo.at(-1)?.final ?? saldoBancos;
