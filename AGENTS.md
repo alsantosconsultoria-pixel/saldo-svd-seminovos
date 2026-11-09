@@ -17,3 +17,4 @@
 - The dashboard executive report reuses the dashboard's selected accounts and calculated indicators, keeping report rendering separate from financial calculations.
 - Forecast spreadsheet import is shared by the top-level picker and file-drop flow so both save identical forecast data; the forecast tab only displays and manages those data.
 - Daily balance drilldowns show posted transactions for the selected account, date and credit/debit scope through the shared transaction table; opening and closing balances stay separate from transaction totals to avoid implying they are daily sums.
+- Financial plan accounts (plano_contas) and category→account mapping (plano_categorias) are admin-writable, team-readable; the Fluxo tab groups forecasts via fluxoPorPlano in src/lib/plano.ts so screen, report and Excel share one structure.
