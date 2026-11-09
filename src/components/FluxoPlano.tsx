@@ -7,7 +7,7 @@ import type { LinhaPlano } from "@/lib/plano";
 
 const n = (v: number) => (v ? fmt(v).replace("R$", "").trim() : "—");
 
-export function FluxoPlano({ linhas, periodo, abertos, setAbertos }: { linhas: LinhaPlano[]; periodo: DiaFluxo[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void }) {
+export function FluxoPlano({ linhas, periodo, abertos, setAbertos, semSaldo = false }: { linhas: LinhaPlano[]; periodo: DiaFluxo[]; semSaldo?: boolean; abertos: Set<string>; setAbertos: (s: Set<string>) => void }) {
   const alternar = (id: string) => { const s = new Set(abertos); if (s.has(id)) s.delete(id); else s.add(id); setAbertos(s); };
   const todos = linhas.flatMap((g) => [g.id, ...g.filhos.map((f) => f.id)]);
   const cel = "num whitespace-nowrap border-l px-3 py-1.5 text-right";
@@ -35,10 +35,10 @@ export function FluxoPlano({ linhas, periodo, abertos, setAbertos }: { linhas: L
     <div className="overflow-x-auto"><table className="w-full border-collapse text-sm">
       <thead><tr className="border-b-2 border-primary"><th className={rot + " bg-card font-semibold"}>Plano financeiro</th>{periodo.map((d) => <th key={d.data} className={cel + " font-semibold"}>{fmtData(d.data).slice(0, 5)}</th>)}<th className={cel + " font-semibold"}>Total</th></tr></thead>
       <tbody>
-        <tr className="border-b"><td className={rot + " font-medium"}>Saldo inicial</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.inicial < 0 ? "text-debit" : ""}`}>{n(d.inicial)}</td>)}<td className={cel} /></tr>
+        {!semSaldo && <tr className="border-b"><td className={rot + " font-medium"}>Saldo inicial</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.inicial < 0 ? "text-debit" : ""}`}>{n(d.inicial)}</td>)}<td className={cel} /></tr>}
         {linhas.map((l) => <Fragment key={l.id}><Linha l={l} nivel={0} /></Fragment>)}
         <tr className="border-b"><td className={rot + " font-medium"}>Resultado do dia</td>{periodo.map((d, i) => { const v = (rec?.valores[i] ?? 0) - (pag?.valores[i] ?? 0); return <td key={d.data} className={`${cel} ${v < 0 ? "text-debit" : ""}`}>{n(v)}</td>; })}<td className={cel}>{n((rec?.total ?? 0) - (pag?.total ?? 0))}</td></tr>
-        <tr className="border-t-2 border-foreground/30 bg-muted/30 font-semibold"><td className={rot + " bg-muted"}>Saldo previsto</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.final < 0 ? "bg-destructive/10 text-debit" : ""}`}>{n(d.final)}</td>)}<td className={cel} /></tr>
+        {!semSaldo && <tr className="border-t-2 border-foreground/30 bg-muted/30 font-semibold"><td className={rot + " bg-muted"}>Saldo previsto</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.final < 0 ? "bg-destructive/10 text-debit" : ""}`}>{n(d.final)}</td>)}<td className={cel} /></tr>}
       </tbody>
     </table></div>
   </div>;
