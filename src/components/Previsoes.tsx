@@ -97,7 +97,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
         </div>
       </Card>
 
-      {relatorio ? <RelatorioFluxo periodo={periodo} saldoBancos={saldoBancos} base={baseExtratos} receber={soma(rec)} pagar={soma(pag)} maiores={[...pag].sort((a, b) => b.valor - a.valor).slice(0, 8)} plano={plano} abertos={abertos} setAbertos={setAbertos} /> : <>
+      {relatorio && periodo.length > 0 ? <RelatorioFluxo periodo={periodo} saldoBancos={saldoBancos} base={baseExtratos} receber={soma(rec)} pagar={soma(pag)} maiores={[...pag].sort((a, b) => b.valor - a.valor).slice(0, 8)} plano={plano} abertos={abertos} setAbertos={setAbertos} /> : <>
       <div className="grid gap-4 sm:grid-cols-4">
         <Card className="p-4"><div className="text-xs text-muted-foreground">Saldo dos bancos {baseExtratos && `(extratos até ${fmtData(baseExtratos)})`}</div><div className="num text-lg font-semibold">{fmt(saldoBancos)}</div></Card>
         <Card className="p-4"><div className="text-xs text-muted-foreground">A receber no período</div><div className="num text-lg font-semibold text-credit">{fmt(soma(rec))}</div></Card>
