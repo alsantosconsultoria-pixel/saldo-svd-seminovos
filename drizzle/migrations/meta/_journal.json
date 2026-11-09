@@ -64,6 +64,13 @@
       "when": 1794232710718,
       "tag": "0008_plano_financeiro",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794234431194,
+      "tag": "0009_plano_restrict_read",
+      "breakpoints": true
     }
   ]
 }
