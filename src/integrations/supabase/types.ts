@@ -77,6 +77,53 @@ export type Database = {
         }
         Relationships: []
       }
+      plano_categorias: {
+        Row: {
+          categoria: string
+          conta_id: string
+        }
+        Insert: {
+          categoria: string
+          conta_id: string
+        }
+        Update: {
+          categoria?: string
+          conta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plano_categorias_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "plano_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plano_contas: {
+        Row: {
+          codigo: string
+          criado_em: string
+          id: string
+          nome: string
+          tipo: string
+        }
+        Insert: {
+          codigo: string
+          criado_em?: string
+          id?: string
+          nome: string
+          tipo: string
+        }
+        Update: {
+          codigo?: string
+          criado_em?: string
+          id?: string
+          nome?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       previsoes: {
         Row: {
           arquivo: string
