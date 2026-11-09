@@ -57,7 +57,7 @@ export const criarUsuario = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error } = await supabaseAdmin.auth.admin.createUser({ email: data.email, password: data.senha, email_confirm: true });
     if (error || !u.user) throw new Error(error?.message.includes("already") ? "Este e-mail já tem cadastro." : "Não foi possível criar o usuário.");
-    if (data.admin) await supabaseAdmin.from("user_roles").insert({ user_id: u.user.id, role: "admin" });
+    await supabaseAdmin.from("user_roles").insert([{ user_id: u.user.id, role: "user" as const }, ...(data.admin ? [{ user_id: u.user.id, role: "admin" as const }] : [])]);
     return { ok: true };
   });
 
