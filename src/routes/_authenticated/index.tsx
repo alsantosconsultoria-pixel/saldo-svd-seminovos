@@ -24,6 +24,7 @@ import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { souAdmin } from "@/lib/admin.functions";
 import { AdminUsuarios } from "@/components/AdminUsuarios";
+import { AdminPlano } from "@/components/AdminPlano";
 import { MinhaSenha } from "@/components/MinhaSenha";
 import { AdminDados } from "@/components/AdminDados";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -331,7 +332,7 @@ function Index() {
           </TabsList>
 
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
-          {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminDados /></TabsContent>}
+          {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminPlano /><AdminDados /></TabsContent>}
           <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} realizados={realizados} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
