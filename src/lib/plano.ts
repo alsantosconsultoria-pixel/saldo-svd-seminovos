@@ -26,8 +26,8 @@ export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaP
     const filhos = [...contasMap.entries()].map(([cid, cats]) => {
       const c = porId.get(cid);
       const catLinhas = [...cats.entries()].sort().map(([cat, v]) => linha(`${g.id}|${cid}|${cat}`, cat, v, []));
-      return linha(`${g.id}|${cid}`, c ? `${c.codigo} · ${c.nome}` : "Sem conta associada", soma(catLinhas, dias.length), catLinhas, c?.codigo ?? "~");
-    }).sort((a, b) => a.ordem.localeCompare(b.ordem, "pt-BR", { numeric: true }));
+      return linha(`${g.id}|${cid}`, c ? `${c.codigo} · ${c.nome}` : "Sem conta associada", soma(catLinhas, dias.length), catLinhas, c?.codigo ?? "");
+    }).sort((a, b) => (!a.ordem ? 1 : !b.ordem ? -1 : a.ordem.localeCompare(b.ordem, "pt-BR", { numeric: true })));
     return linha(g.id, g.rotulo, soma(filhos, dias.length), filhos);
   });
 }
