@@ -26,6 +26,16 @@ export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaP
       v[d] = (v[d] ?? 0) + cent(i.valor);
       cats.set(cat, v); contasMap.set(conta, cats);
     }
+    // Todas as categorias associadas às contas deste grupo aparecem, mesmo sem valor no período.
+    for (const [cat, cid] of Object.entries(mapa)) {
+      const c0 = porId.get(cid);
+      if (!c0 || c0.tipo !== g.id) continue;
+      const nome = c0.nome.trim();
+      if (!ordemNome.has(nome) || c0.codigo.localeCompare(ordemNome.get(nome)!, "pt-BR", { numeric: true }) < 0) ordemNome.set(nome, c0.codigo);
+      const cats = contasMap.get(nome) ?? new Map<string, number[]>();
+      if (!cats.has(cat)) cats.set(cat, dias.map(() => 0));
+      contasMap.set(nome, cats);
+    }
     const filhos = [...contasMap.entries()].map(([cid, cats]) => {
       const catLinhas = [...cats.entries()].sort().map(([cat, v]) => linha(`${g.id}|${cid}|${cat}`, cat, v, []));
       return linha(`${g.id}|${cid}`, cid === "_sem" ? "Sem conta associada" : cid, soma(catLinhas, dias.length), catLinhas, ordemNome.get(cid) ?? "");
