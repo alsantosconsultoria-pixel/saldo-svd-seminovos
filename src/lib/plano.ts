@@ -9,7 +9,7 @@ const cent = (v: number) => Math.round(v * 100);
 export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaPlano[], mapa: Record<string, string>, hoje: string): LinhaPlano[] {
   const idx = new Map(dias.map((d, i) => [d, i]));
   const porId = new Map(contas.map((c) => [c.id, c]));
-  const grupos = [{ id: "credito", rotulo: "Créditos (a receber)", tipo: "receber" }, { id: "debito", rotulo: "Débitos (a pagar)", tipo: "pagar" }];
+  const grupos = [{ id: "credito", rotulo: "À Receber", tipo: "receber" }, { id: "debito", rotulo: "À pagar)", tipo: "pagar" }];
   return grupos.map((g) => {
     const contasMap = new Map<string, Map<string, number[]>>();
     const ordemNome = new Map<string, string>();
