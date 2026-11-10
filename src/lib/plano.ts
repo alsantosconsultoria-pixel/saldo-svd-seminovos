@@ -12,21 +12,23 @@ export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaP
   const grupos = [{ id: "credito", rotulo: "Créditos (a receber)", tipo: "receber" }, { id: "debito", rotulo: "Débitos (a pagar)", tipo: "pagar" }];
   return grupos.map((g) => {
     const contasMap = new Map<string, Map<string, number[]>>();
+    const ordemNome = new Map<string, string>();
     for (const i of itens) {
       if ((i.tipo === "receber") !== (g.tipo === "receber")) continue;
       const d = idx.get(i.vencimento < hoje ? hoje : i.vencimento);
       if (d === undefined) continue;
       const cat = i.categoria || "Sem categoria";
-      const conta = porId.has(mapa[cat] ?? "") ? mapa[cat]! : "_sem";
+      const c0 = porId.get(mapa[cat] ?? "");
+      const conta = c0 ? c0.nome.trim() : "_sem";
+      if (c0 && (!ordemNome.has(conta) || c0.codigo.localeCompare(ordemNome.get(conta)!, "pt-BR", { numeric: true }) < 0)) ordemNome.set(conta, c0.codigo);
       const cats = contasMap.get(conta) ?? new Map<string, number[]>();
       const v = cats.get(cat) ?? dias.map(() => 0);
       v[d] = (v[d] ?? 0) + cent(i.valor);
       cats.set(cat, v); contasMap.set(conta, cats);
     }
     const filhos = [...contasMap.entries()].map(([cid, cats]) => {
-      const c = porId.get(cid);
       const catLinhas = [...cats.entries()].sort().map(([cat, v]) => linha(`${g.id}|${cid}|${cat}`, cat, v, []));
-      return linha(`${g.id}|${cid}`, c ? `${c.codigo} · ${c.nome}` : "Sem conta associada", soma(catLinhas, dias.length), catLinhas, c?.codigo ?? "");
+      return linha(`${g.id}|${cid}`, cid === "_sem" ? "Sem conta associada" : cid, soma(catLinhas, dias.length), catLinhas, ordemNome.get(cid) ?? "");
     }).sort((a, b) => (!a.ordem ? 1 : !b.ordem ? -1 : a.ordem.localeCompare(b.ordem, "pt-BR", { numeric: true })));
     return linha(g.id, g.rotulo, soma(filhos, dias.length), filhos);
   });
