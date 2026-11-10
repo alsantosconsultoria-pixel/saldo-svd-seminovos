@@ -71,6 +71,13 @@
       "when": 1794234431194,
       "tag": "0009_plano_restrict_read",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794344044464,
+      "tag": "0010_realizados_team_read",
+      "breakpoints": true
     }
   ]
 }
