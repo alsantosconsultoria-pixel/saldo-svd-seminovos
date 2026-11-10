@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { ListTree, Plus, Trash2 } from "lucide-react";
+import { Download, FileSpreadsheet, ListTree, Plus, Trash2, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
+import { useRef } from "react";
+import { lerPlanilhaPlano } from "@/lib/plano-planilha";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,10 +49,60 @@ export function AdminPlano() {
     setMapa((m) => { const n = { ...m }; if (conta) n[categoria] = conta; else delete n[categoria]; return n; });
   }
 
+  const arq = useRef<HTMLInputElement>(null);
+  const natureza = (t: string) => (t === "receber" ? "Receita" : "Despesa");
+  function salvar(linhas: Record<string, string>[], aba: string, nome: string, extra?: Record<string, string>[]) {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    ws["!cols"] = [{ wch: 50 }, { wch: 12 }, { wch: 14 }, { wch: 36 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, ws, aba);
+    if (extra) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(extra), "Contas");
+    XLSX.writeFile(wb, nome);
+  }
+  const porId = new Map(contas.map((c) => [c.id, c]));
+  const linhaCat = (c: { categoria: string; tipo: string }, vazia: boolean) => {
+    const k = vazia ? undefined : porId.get(mapa[c.categoria] ?? "");
+    return { Categoria: c.categoria, Natureza: natureza(c.tipo), "Nº da conta": k?.codigo ?? "", "Nome da conta": k?.nome ?? "", "Tipo da conta": k ? (k.tipo === "credito" ? "Crédito" : "Débito") : "" };
+  };
+  function baixarPlano() {
+    salvar(cats.map((c) => linhaCat(c, false)), "Plano", "plano-financeiro.xlsx",
+      contas.map((c) => ({ "Nº da conta": c.codigo, "Nome da conta": c.nome, "Tipo da conta": c.tipo === "credito" ? "Crédito" : "Débito", Categorias: String(Object.values(mapa).filter((v) => v === c.id).length) })));
+  }
+  function baixarModelo() { salvar(cats.map((c) => linhaCat(c, false)), "Plano", "modelo-plano-financeiro.xlsx"); }
+  async function enviar(f: File) {
+    try {
+      const wb = XLSX.read(await f.arrayBuffer());
+      const folha = wb.Sheets[wb.SheetNames[0] ?? ""];
+      const linhas = folha ? lerPlanilhaPlano(XLSX.utils.sheet_to_json<Record<string, unknown>>(folha, { raw: false })) : [];
+      if (!linhas.length) { toast.error("Nenhuma linha com Nº da conta preenchido."); return; }
+      const ids = new Map(contas.map((c) => [c.codigo, c.id]));
+      const novas = [...new Map(linhas.filter((l) => !ids.has(l.codigo)).map((l) => [l.codigo, { codigo: l.codigo, nome: l.nome, tipo: l.tipo }])).values()];
+      if (novas.length) {
+        const { data, error } = await supabase.from("plano_contas").insert(novas).select("id,codigo");
+        if (error) throw error;
+        for (const c of data ?? []) ids.set(c.codigo, c.id);
+      }
+      const assoc = [...new Map(linhas.map((l) => [l.categoria, { categoria: l.categoria, conta_id: ids.get(l.codigo)! }])).values()];
+      const { error } = await supabase.from("plano_categorias").upsert(assoc);
+      if (error) throw error;
+      toast.success(`${novas.length} conta(s) criada(s) e ${assoc.length} categoria(s) associada(s).`);
+      carregar();
+    } catch (e) { toast.error("Não foi possível ler a planilha: " + (e as Error).message); }
+    finally { if (arq.current) arq.current.value = ""; }
+  }
+
   const sel = "h-9 rounded-md border bg-background px-2 text-sm";
   return (
     <Card className="space-y-5 p-5">
-      <div className="flex items-center gap-2 font-semibold"><ListTree className="size-4" /> Plano financeiro</div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-semibold"><ListTree className="size-4" /> Plano financeiro</div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={baixarPlano} disabled={!contas.length}><Download /> Baixar plano</Button>
+          <Button size="sm" variant="outline" onClick={baixarModelo} disabled={!cats.length}><FileSpreadsheet /> Planilha modelo</Button>
+          <Button size="sm" onClick={() => arq.current?.click()}><Upload /> Enviar planilha</Button>
+          <input ref={arq} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f); }} />
+        </div>
+      </div>
       <div className="flex flex-wrap items-end gap-2">
         <div><label className="text-xs text-muted-foreground">Nº da conta</label><Input className="w-28" placeholder="2.01.003" value={nova.codigo} onChange={(e) => setNova({ ...nova, codigo: e.target.value })} /></div>
         <div className="flex-1"><label className="text-xs text-muted-foreground">Nome</label><Input placeholder="Despesas com pessoal" value={nova.nome} onChange={(e) => setNova({ ...nova, nome: e.target.value })} /></div>
