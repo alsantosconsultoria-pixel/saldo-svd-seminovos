@@ -11,7 +11,7 @@ describe("fluxoPorPlano", () => {
       { tipo: "receber", vencimento: "2026-11-01", categoria: "Vendas", valor: 3 },
     ], ["2026-11-10", "2026-11-11"], contas, { ICMS: "a", ISS: "a" }, "2026-11-10");
     expect(deb!.valores).toEqual([15, 7]);
-    expect(deb!.filhos[0]).toMatchObject({ rotulo: "2.1 · Impostos", total: 15 });
+    expect(deb!.filhos[0]).toMatchObject({ rotulo: "Impostos", total: 15 });
     expect(deb!.filhos[1]).toMatchObject({ rotulo: "Sem conta associada", total: 7 });
     expect(cred!.valores).toEqual([3, 0]); // vencido entra hoje
   });
