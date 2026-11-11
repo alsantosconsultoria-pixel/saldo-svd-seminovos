@@ -99,6 +99,13 @@
       "when": 1794407608705,
       "tag": "0013_extratos_team_write",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794409073384,
+      "tag": "0014_realtime_all_tables",
+      "breakpoints": true
     }
   ]
 }
