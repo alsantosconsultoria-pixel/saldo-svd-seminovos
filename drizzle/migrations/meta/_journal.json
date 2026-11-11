@@ -106,6 +106,13 @@
       "when": 1794409073384,
       "tag": "0014_realtime_all_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794410114519,
+      "tag": "0015_extratos_team_delete",
+      "breakpoints": true
     }
   ]
 }
