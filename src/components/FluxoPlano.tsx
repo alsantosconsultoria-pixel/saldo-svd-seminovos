@@ -47,7 +47,7 @@ export function FluxoPlano({ linhas, periodo, abertos, setAbertos, semSaldo = fa
 }
 
 // Planilha Excel no mesmo layout (linhas abertas/fechadas como na tela).
-export function baixarExcelPlano(linhas: LinhaPlano[], periodo: DiaFluxo[], abertos: Set<string>, titulo: string) {
+export function baixarExcelPlano(linhas: LinhaPlano[], periodo: DiaFluxo[], abertos: Set<string>, titulo: string, semSaldo = false) {
   const v = (x: number) => (x ? x.toFixed(2).replace(".", ",") : "");
   const td = (x: string | number, st = "") => `<td style="border:1px solid #d6d9de;padding:4px 8px;${typeof x === "number" ? "mso-number-format:'#,##0.00';text-align:right;" : ""}${st}">${typeof x === "number" ? v(x) : x}</td>`;
   const rows: string[] = [];
@@ -57,17 +57,17 @@ export function baixarExcelPlano(linhas: LinhaPlano[], periodo: DiaFluxo[], aber
     rows.push(`<tr>${td("&nbsp;".repeat(nivel * 4) + l.rotulo, fundo)}${l.valores.map((x) => td(x, fundo + `color:${cor};`)).join("")}${td(l.total, fundo + `color:${cor};font-weight:bold;`)}</tr>`);
     if (abertos.has(l.id)) l.filhos.forEach((f) => linha(f, nivel + 1));
   };
-  rows.push(`<tr>${td("Saldo inicial", "font-weight:bold;")}${periodo.map((d) => td(d.inicial)).join("")}${td("")}</tr>`);
+  if (!semSaldo) rows.push(`<tr>${td("Saldo inicial", "font-weight:bold;")}${periodo.map((d) => td(d.inicial)).join("")}${td("")}</tr>`);
   linhas.forEach((l) => linha(l, 0));
   const [r, p] = linhas;
   rows.push(`<tr>${td("Resultado do dia", "font-weight:bold;")}${periodo.map((_, i) => td((r?.valores[i] ?? 0) - (p?.valores[i] ?? 0))).join("")}${td((r?.total ?? 0) - (p?.total ?? 0))}</tr>`);
-  rows.push(`<tr>${td("Saldo previsto", "font-weight:bold;background:#e2e8f0;")}${periodo.map((d) => td(d.final, `font-weight:bold;background:#e2e8f0;${d.final < 0 ? "color:#b91c1c;" : ""}`)).join("")}${td("", "background:#e2e8f0;")}</tr>`);
+  if (!semSaldo) rows.push(`<tr>${td("Saldo previsto", "font-weight:bold;background:#e2e8f0;")}${periodo.map((d) => td(d.final, `font-weight:bold;background:#e2e8f0;${d.final < 0 ? "color:#b91c1c;" : ""}`)).join("")}${td("", "background:#e2e8f0;")}</tr>`);
   const head = `<tr>${td("Plano financeiro", "background:#1e3a5f;color:#fff;font-weight:bold;")}${periodo.map((d) => td(fmtData(d.data), "background:#1e3a5f;color:#fff;font-weight:bold;text-align:right;")).join("")}${td("Total", "background:#1e3a5f;color:#fff;font-weight:bold;text-align:right;")}</tr>`;
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body style="font-family:Calibri,Arial"><table><tr><td colspan="${periodo.length + 2}" style="font-size:11px;color:#64748b;letter-spacing:2px">FINANCEIRO SVD SEMINOVOS · GRUPO SVD</td></tr><tr><td colspan="${periodo.length + 2}" style="font-size:18px;font-weight:bold">${titulo}</td></tr><tr></tr>${head}${rows.join("")}<tr></tr><tr><td colspan="${periodo.length + 2}" style="font-size:10px;color:#64748b">Gerado em ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</td></tr></table></body></html>`;
   const blob = new Blob(["\ufeff" + html], { type: "application/vnd.ms-excel" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `fluxo-${periodo[0]?.data ?? ""}-a-${periodo.at(-1)?.data ?? ""}.xls`;
+  a.href = url; a.download = `fluxo${semSaldo ? "-realizado" : ""}-${periodo[0]?.data ?? ""}-a-${periodo.at(-1)?.data ?? ""}.xls`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
