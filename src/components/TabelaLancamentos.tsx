@@ -9,7 +9,7 @@ export type LancamentoExibido = Transacao & { banco: string; conta: string; extr
 export function TabelaLancamentos({ itens, vinculos }: { itens: LancamentoExibido[]; vinculos?: Map<string, Realizado[]> }) {
   const entradas = itens.filter((t) => t.tipo === "C").reduce((a, t) => a + t.valor, 0);
   const saidas = itens.filter((t) => t.tipo === "D").reduce((a, t) => a + t.valor, 0);
-  return <Table>
+  return <div className="overflow-x-auto"><Table>
     <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Banco / Conta</TableHead><TableHead>Descrição</TableHead><TableHead>Contraparte</TableHead><TableHead>CNPJ/CPF</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
     <TableBody>
       {itens.length === 0 && <TableRow><TableCell colSpan={6} className="text-muted-foreground">Nenhum lançamento no período.</TableCell></TableRow>}
@@ -33,5 +33,5 @@ export function TabelaLancamentos({ itens, vinculos }: { itens: LancamentoExibid
       <TableRow><TableCell colSpan={5} className="text-right">Total de saídas</TableCell><TableCell className="num text-right text-debit">-{fmt(saidas)}</TableCell></TableRow>
       <TableRow><TableCell colSpan={5} className="text-right">Resultado do período</TableCell><TableCell className={`num text-right ${entradas - saidas >= 0 ? "text-credit" : "text-debit"}`}>{fmt(entradas - saidas)}</TableCell></TableRow>
     </TableFooter>
-  </Table>;
+  </Table></div>;
 }
