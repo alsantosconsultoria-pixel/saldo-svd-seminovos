@@ -313,6 +313,7 @@ function Index() {
           <label className="text-xs text-muted-foreground">Data inicial<Input type="date" className="w-40 bg-card" value={painelDe} onChange={(e) => setPainelDe(e.target.value)} /></label>
           <label className="text-xs text-muted-foreground">Data final<Input type="date" className="w-40 bg-card" value={painelAte} onChange={(e) => setPainelAte(e.target.value)} /></label>
           {(painelDe || painelAte) && <Button variant="ghost" size="sm" onClick={() => { setPainelDe(""); setPainelAte(""); }}>Limpar período</Button>}
+          <Button variant="ghost" size="sm" onClick={() => { setPainelDe(hojeIso); setPainelAte(hojeIso); }}>Hoje</Button>
           <p className="ml-auto text-sm">Último dia do realizado: <span className="num font-semibold">{ultimoRealizado ? fmtData(ultimoRealizado) : "sem planilha importada"}</span></p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -490,6 +491,7 @@ function Index() {
                   <label className="mb-1 block text-xs text-muted-foreground" htmlFor="lanc-ate">Até</label>
                   <Input id="lanc-ate" type="date" value={lancAte} onChange={(e) => setLancAte(e.target.value)} className="w-40" />
                 </div>
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setLancDe(hojeIso); setLancAte(hojeIso); }}>Hoje</Button>
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground" htmlFor="lanc-conta">Conta bancária</label>
                   <select id="lanc-conta" value={lancConta} onChange={(e) => setLancConta(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
