@@ -27,6 +27,7 @@ export function useExtratos() {
     if (!pronto) return;
     let canal: ReturnType<typeof supabase.channel> | null = null;
     let ativo = true;
+    let onFoco: (() => void) | null = null;
 
     (async () => {
       const { data: sessao } = await supabase.auth.getUser();
@@ -39,24 +40,18 @@ export function useExtratos() {
       }
       const naNuvem = (data ?? []).map((r) => r.dados as unknown as Extrato);
       remoto.current = true;
-      if (naNuvem.length) {
-        // mescla nuvem com o que só existe localmente (ex.: dados deste PC antes do login)
-        setLista((local) => {
-          let merged = naNuvem;
-          local.forEach((e) => {
-            if (!naNuvem.some((n) => n.id === e.id)) merged = mesclar(merged, e);
-          });
-          return merged;
-        });
-      } else {
-        // nuvem vazia: sobe o que há localmente
-        setLista((local) => {
-          local.forEach((e) => void subir(e));
-          return local;
-        });
-      }
+      // a nuvem é a fonte oficial: descarta cópias locais antigas para todos verem o mesmo
+      aplicandoRemoto.current = true;
+      setLista(naNuvem);
+      setTimeout(() => (aplicandoRemoto.current = false), 0);
+      const recarregar = async () => {
+        const { data: d } = await supabase.from("extratos").select("id, dados");
+        if (d && ativo) setLista(d.map((r) => r.dados as unknown as Extrato));
+      };
+      onFoco = () => { if (document.visibilityState === "visible") void recarregar(); };
+      document.addEventListener("visibilitychange", onFoco);
       canal = supabase
-        .channel("extratos-sync")
+        .channel(`extratos-sync-${Math.random().toString(36).slice(2)}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "extratos" }, (payload) => {
           aplicandoRemoto.current = true;
           if (payload.eventType === "DELETE") {
@@ -77,6 +72,7 @@ export function useExtratos() {
     return () => {
       ativo = false;
       if (canal) supabase.removeChannel(canal);
+      if (onFoco) document.removeEventListener("visibilitychange", onFoco);
     };
   }, [pronto]);
 
