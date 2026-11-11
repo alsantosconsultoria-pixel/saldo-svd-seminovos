@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, FileText, Printer, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, FileText, Printer, Sparkles, Tag, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui/card";
@@ -18,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { FluxoPlano, baixarExcelPlano } from "@/components/FluxoPlano";
 import { fluxoPorPlano, type ContaPlano, type LinhaPlano } from "@/lib/plano";
 
-interface Prev { id: string; tipo: string; vencimento: string; descricao: string; contraparte: string; documento: string; banco: string; categoria: string; valor: number }
+interface Prev { id: string; tipo: string; vencimento: string; descricao: string; contraparte: string; documento: string; banco: string; categoria: string; valor: number; marcador?: string }
 
 export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: Extrato[]; atualizacao?: number; realizados?: Realizado[] }) {
   const [itens, setItens] = useState<Prev[]>([]);
@@ -29,6 +30,8 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
   const [de, setDe] = useState(dia);
   const [ate, setAte] = useState(() => mais(dia, 14));
   const [relatorio, setRelatorio] = useState(false);
+  const [comMarcador, setComMarcador] = useState(false);
+  const [comp, setComp] = useState<{ id: string; rotulo: string } | null>(null);
 
   const [contas, setContas] = useState<ContaPlano[]>([]);
   const [mapa, setMapa] = useState<Record<string, string>>({});
@@ -68,6 +71,10 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
   const noPeriodo = (i: Prev) => { const v = i.vencimento < dia ? dia : i.vencimento; return v >= ini && v <= ate; };
   const rec = itens.filter((i) => i.tipo === "receber" && noPeriodo(i));
   const pag = itens.filter((i) => i.tipo === "pagar" && noPeriodo(i));
+  const linhaDe = (i: Prev) => { const cat = i.categoria || "Sem categoria"; const c = contas.find((x) => x.id === mapa[cat]); return `${i.tipo === "receber" ? "credito" : "debito"}|${c ? c.nome.trim() : "_sem"}|${cat}`; };
+  const marcados = useMemo(() => { if (!comMarcador) return undefined; const m = new Map<string, number>(); for (const i of itens) if (i.marcador && noPeriodo(i)) m.set(linhaDe(i), (m.get(linhaDe(i)) ?? 0) + 1); return m; }, [comMarcador, itens, contas, mapa, ini, ate]); // eslint-disable-line react-hooks/exhaustive-deps
+  const itensComp = comp ? itens.filter((i) => noPeriodo(i) && linhaDe(i) === comp.id).sort((a, b) => a.vencimento.localeCompare(b.vencimento)) : [];
+  const onComp = (id: string, rotulo: string) => setComp({ id, rotulo });
   const baseExtratos = lista.map((e) => ultimoSaldoExtrato(e).data).filter(Boolean).sort().at(-1) ?? "";
   const soma = (l: Prev[]) => l.reduce((a, b) => a + b.valor, 0);
 
@@ -92,6 +99,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
           <div><label htmlFor="prev-de" className="text-xs text-muted-foreground">De</label><Input id="prev-de" type="date" className="w-40" value={de} onChange={(e) => e.target.value && setDe(e.target.value)} /></div>
           <div><label htmlFor="prev-ate" className="text-xs text-muted-foreground">Até</label><Input id="prev-ate" type="date" className="w-40" value={ate} onChange={(e) => e.target.value && setAte(e.target.value)} /></div>
           {[7, 15, 30].map((n) => <Button key={n} size="sm" variant="ghost" onClick={() => { setDe(dia); setAte(mais(dia, n - 1)); }}>{n} dias</Button>)}
+          <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm"><Checkbox checked={comMarcador} onCheckedChange={(v) => setComMarcador(v === true)} /><Tag className="size-3.5 text-muted-foreground" /> Marcador</label>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setRelatorio((r) => !r)} disabled={!periodo.length}><FileText /> {relatorio ? "Voltar às previsões" : "Relatório de fluxo"}</Button>
@@ -100,7 +108,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
         </div>
       </Card>
 
-      {relatorio && periodo.length > 0 ? <RelatorioFluxo periodo={periodo} saldoBancos={saldoBancos} base={baseExtratos} receber={soma(rec)} pagar={soma(pag)} maiores={[...pag].sort((a, b) => b.valor - a.valor).slice(0, 8)} plano={plano} abertos={abertos} setAbertos={setAbertos} /> : <>
+      {relatorio && periodo.length > 0 ? <RelatorioFluxo periodo={periodo} saldoBancos={saldoBancos} base={baseExtratos} receber={soma(rec)} pagar={soma(pag)} maiores={[...pag].sort((a, b) => b.valor - a.valor).slice(0, 8)} plano={plano} abertos={abertos} setAbertos={setAbertos} marcados={marcados} onComposicao={onComp} /> : <>
       <div className="grid gap-4 sm:grid-cols-4">
         <Card className="p-4"><div className="text-xs text-muted-foreground">Saldo dos bancos {baseExtratos && `(extratos até ${fmtData(baseExtratos)})`}</div><div className="num text-lg font-semibold">{fmt(saldoBancos)}</div></Card>
         <Card className="p-4"><div className="text-xs text-muted-foreground">A receber no período</div><div className="num text-lg font-semibold text-credit">{fmt(soma(rec))}</div></Card>
@@ -110,7 +118,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
 
       <Card className="p-5">
         <h3 className="mb-3 font-semibold">Fluxo de caixa previsto</h3>
-        {periodo.length === 0 ? <p className="text-sm text-muted-foreground">Escolha um período a partir de hoje.</p> : <FluxoPlano linhas={plano} periodo={periodo} abertos={abertos} setAbertos={setAbertos} />}
+        {periodo.length === 0 ? <p className="text-sm text-muted-foreground">Escolha um período a partir de hoje.</p> : <FluxoPlano linhas={plano} periodo={periodo} abertos={abertos} setAbertos={setAbertos} marcados={marcados} onComposicao={onComp} />}
         {periodo.length > 0 && contas.length === 0 && <p className="mt-2 text-xs text-muted-foreground">Cadastre o plano financeiro em Administração para abrir as contas e categorias.</p>}
       </Card>
 
@@ -157,6 +165,15 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
         )}
       </Card>
       </>}
+      <Dialog open={!!comp} onOpenChange={(o) => !o && setComp(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader><DialogTitle>{comp?.rotulo} · {fmt(soma(itensComp))}</DialogTitle></DialogHeader>
+          <div className="max-h-[60vh] overflow-auto"><Table>
+            <TableHeader><TableRow><TableHead>Vencimento</TableHead><TableHead>Cliente/Fornecedor</TableHead><TableHead>Nº documento</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+            <TableBody>{itensComp.map((i) => <TableRow key={i.id}><TableCell className="num">{fmtData(i.vencimento)}</TableCell><TableCell className="whitespace-normal"><div>{i.contraparte || "—"}</div>{i.marcador && <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Tag className="size-3" />{i.marcador}</span>}</TableCell><TableCell className="text-xs">{i.documento || "—"}</TableCell><TableCell className="num text-right">{fmt(i.valor)}</TableCell></TableRow>)}</TableBody>
+          </Table></div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -175,7 +192,7 @@ function Curva({ periodo }: { periodo: DiaFluxo[] }) {
 }
 
 
-function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, plano, abertos, setAbertos }: { periodo: DiaFluxo[]; saldoBancos: number; base: string; receber: number; pagar: number; maiores: Prev[]; plano: LinhaPlano[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void }) {
+function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, plano, abertos, setAbertos, marcados, onComposicao }: { periodo: DiaFluxo[]; saldoBancos: number; base: string; receber: number; pagar: number; maiores: Prev[]; plano: LinhaPlano[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number> | undefined; onComposicao?: ((id: string, rotulo: string) => void) | undefined }) {
   const final = periodo.at(-1)?.final ?? saldoBancos;
   const menor = periodo.reduce((m, d) => (d.final < m.final ? d : m), periodo[0]!);
   const criticos = periodo.filter((d) => d.faltante > 0);
@@ -203,10 +220,10 @@ function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, p
       <ul className="list-disc space-y-1 pl-5 text-sm">{recs.map((r) => <li key={r}>{r}</li>)}</ul>
       {falta > 0 && <p className="mt-2 text-sm font-semibold text-debit">Maior falta diária para pagamentos: {fmt(falta)}.</p>}
     </section>
-    <section><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">02 · Fluxo por plano financeiro</h2><FluxoPlano linhas={plano} periodo={periodo} abertos={abertos} setAbertos={setAbertos} /></section>
+    <section><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">02 · Fluxo por plano financeiro</h2><FluxoPlano linhas={plano} periodo={periodo} abertos={abertos} setAbertos={setAbertos} marcados={marcados} onComposicao={onComposicao} /></section>
     <section className="break-inside-avoid"><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">03 · Curva do saldo</h2><Curva periodo={periodo} /></section>
     {maiores.length > 0 && <section className="break-inside-avoid"><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">04 · Maiores pagamentos do período</h2>
-      <table className="w-full text-sm"><tbody>{maiores.map((m) => <tr key={m.id} className="border-b"><td className="num py-1.5">{fmtData(m.vencimento)}</td><td>{m.contraparte || "—"}</td><td className="text-muted-foreground">{m.categoria}</td><td className="num text-right">{fmt(m.valor)}</td></tr>)}</tbody></table>
+      <table className="w-full text-sm"><thead><tr className="border-b text-left text-[11px] uppercase tracking-wider text-muted-foreground"><th className="py-1.5 font-medium">Vencimento</th><th className="font-medium">Fornecedor</th><th className="font-medium">Categoria</th><th className="font-medium">Marcador</th><th className="text-right font-medium">Valor</th></tr></thead><tbody>{maiores.map((m) => <tr key={m.id} className="border-b"><td className="num py-1.5">{fmtData(m.vencimento)}</td><td>{m.contraparte || "—"}</td><td className="text-muted-foreground">{m.categoria}</td><td className="text-xs text-muted-foreground">{m.marcador ? <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"><Tag className="size-3" />{m.marcador}</span> : "—"}</td><td className="num text-right">{fmt(m.valor)}</td></tr>)}</tbody></table>
     </section>}
     <footer className="border-t pt-3 text-xs text-muted-foreground">Projeção baseada nas previsões importadas; sem baixa nos saldos bancários. Gerado em {new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.</footer>
   </article>;

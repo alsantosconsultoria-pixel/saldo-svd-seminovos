@@ -43,6 +43,7 @@ export async function importarPrevisoes(f: File): Promise<number> {
       contraparte: String(pega(r, "cliente/fornecedor", "cliente fornecedor", "contraparte", "fornecedor", "cliente", "favorecido")).trim(),
       documento: String(pega(r, "no documento", "nº documento", "n documento", "documento")).trim(),
       banco: String(pega(r, "conta", "banco")), categoria: String(pega(r, "categoria financeira", "categoria")),
+      marcador: String(pega(r, "marcador", "marcadores", "tag", "etiqueta")).trim(),
     }];
   });
   if (!novos.length) throw new Error("Nenhuma linha válida. Confira as colunas Data vencimento e Valor título.");
