@@ -98,6 +98,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
         <div className="flex flex-wrap items-end gap-3">
           <div><label htmlFor="prev-de" className="text-xs text-muted-foreground">De</label><Input id="prev-de" type="date" className="w-40" value={de} onChange={(e) => e.target.value && setDe(e.target.value)} /></div>
           <div><label htmlFor="prev-ate" className="text-xs text-muted-foreground">Até</label><Input id="prev-ate" type="date" className="w-40" value={ate} onChange={(e) => e.target.value && setAte(e.target.value)} /></div>
+          <Button size="sm" variant="ghost" onClick={() => { setDe(dia); setAte(dia); }}>Hoje</Button>
           {[7, 15, 30].map((n) => <Button key={n} size="sm" variant="ghost" onClick={() => { setDe(dia); setAte(mais(dia, n - 1)); }}>{n} dias</Button>)}
           <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm"><Checkbox checked={comMarcador} onCheckedChange={(v) => setComMarcador(v === true)} /><Tag className="size-3.5 text-muted-foreground" /> Marcador</label>
         </div>
