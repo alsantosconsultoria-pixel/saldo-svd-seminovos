@@ -1,0 +1,1 @@
+ALTER PUBLICATION supabase_realtime ADD TABLE public.realizados, public.demonstrativos, public.plano_contas, public.plano_categorias;
