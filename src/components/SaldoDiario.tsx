@@ -22,7 +22,7 @@ export function SaldoDiario({ contas }: { contas: Extrato[] }) {
   return <div className="space-y-4">
     {contas.map((e) => <Card key={e.id} className="p-5">
       <h3 className="mb-3 font-semibold">{contaLabel(e)}</h3>
-      <Table>
+      <div className="overflow-x-auto"><Table>
         <TableHeader><TableRow>
           <TableHead>Data</TableHead><TableHead className="text-right">Abertura</TableHead><TableHead className="text-right">Entradas</TableHead><TableHead className="text-right">Saídas</TableHead><TableHead className="text-right">Total do dia</TableHead><TableHead className="text-right">Fechamento calculado</TableHead><TableHead className="text-right">Saldo do banco</TableHead><TableHead>Conferência</TableHead>
         </TableRow></TableHeader>
@@ -39,7 +39,7 @@ export function SaldoDiario({ contas }: { contas: Extrato[] }) {
             <TableCell>{d.ok === null ? <span className="text-xs text-muted-foreground">Saldo parcial calculado</span> : d.ok ? <span className="inline-flex items-center gap-1 text-sm text-credit"><CheckCircle2 className="size-4" /> OK</span> : <span className="inline-flex items-center gap-1 text-sm text-debit"><AlertTriangle className="size-4" /> Dif. {fmt((d.informado ?? 0) - d.fechamento)}</span>}</TableCell>
           </TableRow>)}
         </TableBody>
-      </Table>
+      </Table></div>
     </Card>)}
     <Dialog open={Boolean(composicao && conta)} onOpenChange={(open) => { if (!open) setComposicao(null); }}>
       <DialogContent className="flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-6xl flex-col overflow-hidden">

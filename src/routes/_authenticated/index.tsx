@@ -271,13 +271,13 @@ function Index() {
         <div className="flex flex-col items-center gap-3 text-primary"><Upload className="size-12" /><p className="text-xl font-semibold">Importar arquivos</p><p className="text-sm text-muted-foreground">Extratos PDF · Planilhas Excel / CSV</p></div>
       </div>}
       <header className="border-b bg-primary text-primary-foreground print:bg-transparent print:text-foreground">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] opacity-70">Relatório gerencial</p>
             <h1 className="text-2xl font-semibold">Saldo Diário · Multi-bancos</h1>
           </div>
-          <div className="flex flex-wrap gap-2 print:hidden">
-            <input ref={input} type="file" accept="application/pdf" multiple hidden onChange={(e) => importarArquivos(e.target.files)} />
+          <div className="grid w-full grid-cols-2 gap-2 print:hidden sm:flex sm:w-auto sm:flex-wrap">
+             <input ref={input} type="file" accept="application/pdf" multiple hidden onChange={(e) => importarArquivos(e.target.files)} />
             <Button variant="secondary" onClick={() => input.current?.click()} disabled={carregando}>
               <Upload /> {carregando ? "Importando..." : "Importar extrato PDF"}
             </Button>
@@ -292,10 +292,10 @@ function Index() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-6">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 sm:py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Select value={filtro} onValueChange={setFiltro}>
-            <SelectTrigger className="w-80 bg-card"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full bg-card sm:w-80"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todas as contas ({lista.length})</SelectItem>
               {lista.map((e) => <SelectItem key={e.id} value={e.id}>{contaLabel(e)}</SelectItem>)}
@@ -321,15 +321,17 @@ function Index() {
         </div>
 
         <Tabs value={aba} onValueChange={(valor) => { setAba(valor); setRelatorioPainel(false); }}>
-          <TabsList className="print:hidden">
-            <TabsTrigger value="painel">Painel</TabsTrigger>
-            <TabsTrigger value="diario">Saldo diário</TabsTrigger>
-            <TabsTrigger value="lanc">Lançamentos</TabsTrigger>
-            <TabsTrigger value="contas">Contas</TabsTrigger>
-            <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>
-            <TabsTrigger value="previsoes">Fluxo</TabsTrigger>
-            {admin && <TabsTrigger value="admin">Administração</TabsTrigger>}
-          </TabsList>
+          <div className="-mx-4 overflow-x-auto px-4 pb-1 print:hidden sm:mx-0 sm:px-0">
+            <TabsList className="w-max">
+              <TabsTrigger value="painel">Painel</TabsTrigger>
+              <TabsTrigger value="diario">Saldo diário</TabsTrigger>
+              <TabsTrigger value="lanc">Lançamentos</TabsTrigger>
+              <TabsTrigger value="contas">Contas</TabsTrigger>
+              <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>
+              <TabsTrigger value="previsoes">Fluxo</TabsTrigger>
+              {admin && <TabsTrigger value="admin">Administração</TabsTrigger>}
+            </TabsList>
+          </div>
 
           <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
           {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminPlano /><AdminDados /></TabsContent>}
@@ -509,8 +511,8 @@ function Index() {
 
           <TabsContent value="contas" className="space-y-3">
             {lista.map((e) => (
-              <Card key={e.id} className="flex flex-wrap items-center justify-between gap-3 p-5">
-                <div>
+              <Card key={e.id} className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+                <div className="min-w-0">
                   <div className="font-semibold">{contaLabel(e)}</div>
                   <div className="text-sm text-muted-foreground">{e.titular} · {e.arquivo} · {e.transacoes.length} lançamentos</div>
                 </div>

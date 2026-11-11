@@ -153,7 +153,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
       <Card className="p-5">
         <h3 className="mb-3 font-semibold">Títulos previstos</h3>
         {itens.length === 0 ? <p className="text-sm text-muted-foreground">Nada importado ainda.</p> : (
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow><TableHead>Vencimento</TableHead><TableHead>Operação</TableHead><TableHead>Cliente/Fornecedor</TableHead><TableHead>Nº documento</TableHead><TableHead className="text-right">Valor título</TableHead></TableRow></TableHeader>
             <TableBody>{itens.map((i) => (
               <TableRow key={i.id}>
@@ -164,7 +164,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
                 <TableCell className={`num text-right ${i.tipo === "receber" ? "text-credit" : "text-debit"}`}>{fmt(i.valor)}</TableCell>
               </TableRow>
             ))}</TableBody>
-          </Table>
+          </Table></div>
         )}
       </Card>
       </>}
