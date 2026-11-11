@@ -56,7 +56,12 @@ export function useExtratos() {
           aplicandoRemoto.current = true;
           if (payload.eventType === "DELETE") {
             const id = (payload.old as { id?: string }).id;
-            if (id) setLista((l) => l.filter((x) => x.id !== id));
+            if (id) {
+              setLista((l) => l.filter((x) => x.id !== id));
+            } else {
+              // sem o id no evento, recarrega tudo da nuvem para garantir
+              void recarregar();
+            }
           } else {
             const e = (payload.new as { dados: Extrato }).dados;
             setLista((l) => {
@@ -111,8 +116,14 @@ export function useExtratos() {
 
   const remove = useCallback((id: string) => {
     setLista((l) => l.filter((x) => x.id !== id));
-    void supabase.from("extratos").delete().eq("id", id).then(({ error }) => {
-      if (error) console.error("Falha ao remover extrato da nuvem", error);
+    void supabase.from("extratos").delete().eq("id", id).then(async ({ error }) => {
+      if (error) {
+        console.error("Falha ao remover extrato da nuvem", error);
+        if (typeof window !== "undefined") window.alert(`Não foi possível excluir o extrato na nuvem: ${error.message}`);
+        // recarrega da nuvem para o item excluído só na tela voltar a aparecer
+        const { data: d } = await supabase.from("extratos").select("id, dados");
+        if (d) setLista(d.map((r) => r.dados as unknown as Extrato));
+      }
     });
   }, []);
 
