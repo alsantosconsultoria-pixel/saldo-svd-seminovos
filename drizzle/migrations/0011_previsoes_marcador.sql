@@ -1,0 +1,1 @@
+ALTER TABLE public.previsoes ADD COLUMN IF NOT EXISTS marcador text NOT NULL DEFAULT '';
