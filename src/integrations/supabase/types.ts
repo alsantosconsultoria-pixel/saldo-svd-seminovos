@@ -184,6 +184,7 @@ export type Database = {
           descricao: string
           documento: string
           id: string
+          marcador: string
           tipo: string
           user_id: string
           valor: number
@@ -200,6 +201,7 @@ export type Database = {
           descricao?: string
           documento?: string
           id?: string
+          marcador?: string
           tipo: string
           user_id: string
           valor: number
@@ -216,6 +218,7 @@ export type Database = {
           descricao?: string
           documento?: string
           id?: string
+          marcador?: string
           tipo?: string
           user_id?: string
           valor?: number

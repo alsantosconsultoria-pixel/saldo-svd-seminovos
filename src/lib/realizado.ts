@@ -1,11 +1,11 @@
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import type { Extrato, Transacao } from "@/lib/extrato/parser";
-import { data, norm, pega, valor } from "@/lib/importar-previsoes";
+import { data, norm, pega, pegaMarcador, valor } from "@/lib/importar-previsoes";
 
 export interface Realizado {
   id: string; chave: string; tipo: "pagar" | "receber"; data: string; conta: string;
-  contraparte: string; descricao: string; documento: string; categoria: string; valor: number; vinculo: string | null;
+  contraparte: string; descricao: string; documento: string; categoria: string; valor: number; vinculo: string | null; marcador?: string;
 }
 export type LinhaRealizado = Omit<Realizado, "id" | "vinculo">;
 
@@ -37,6 +37,7 @@ export function lerRealizado(rows: Record<string, unknown>[]): LinhaRealizado[] 
       tipo, data: d, conta, contraparte, documento, valor: v,
       descricao: String(pega(r, "descricao")).replace(/\s+/g, " ").trim(),
       categoria: String(pega(r, "categoria financeira")).trim(),
+      marcador: pegaMarcador(r),
       chave: [tipo, d, numeroConta(conta), v.toFixed(2), documento, contraparte, String(pega(r, "data emissao"))].join("|"),
     }];
   }).map((l) => { const n = (vistos.get(l.chave) ?? 0) + 1; vistos.set(l.chave, n); return n > 1 ? { ...l, chave: `${l.chave}|${n}` } : l; });
@@ -89,7 +90,7 @@ export async function importarRealizado(f: File): Promise<{ novos: number; lidos
   let novos = 0;
   for (let i = 0; i < unicas.length; i += 500) {
     const { data: ins, error } = await supabase.from("realizados")
-      .upsert(unicas.slice(i, i + 500).map((l) => ({ ...l, user_id: u.user!.id, arquivo: f.name })), { onConflict: "chave", ignoreDuplicates: true }).select("id");
+      .upsert(unicas.slice(i, i + 500).map((l) => ({ ...l, user_id: u.user!.id, arquivo: f.name })), { onConflict: "chave" }).select("id");
     if (error) throw new Error("Não foi possível salvar o realizado. Tente novamente.");
     novos += ins?.length ?? 0;
   }

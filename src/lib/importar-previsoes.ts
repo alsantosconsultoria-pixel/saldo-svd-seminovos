@@ -6,6 +6,10 @@ export const pega = (r: Record<string, unknown>, ...nomes: string[]) => {
   const k = Object.keys(r).find((k) => nomes.includes(norm(k)));
   return k && r[k] != null ? r[k] : "";
 };
+export const pegaMarcador = (r: Record<string, unknown>) => {
+  const k = Object.keys(r).find((k) => /^(marcador|tag|etiqueta)/.test(norm(k)));
+  return k && r[k] != null ? String(r[k]).trim() : "";
+};
 export function data(v: unknown): string | null {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   if (typeof v === "number") return new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10);
@@ -15,8 +19,15 @@ export function data(v: unknown): string | null {
 }
 export function valor(v: unknown): number {
   if (typeof v === "number") return v;
-  const s = String(v).replace(/[^\d,.-]/g, "");
-  return Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s) || 0;
+  let s = String(v).trim();
+  const neg = /^\(.*\)$/.test(s) || /-/.test(s);
+  s = s.replace(/[^\d,.]/g, "");
+  if (!s) return 0;
+  const ul = Math.max(s.lastIndexOf(","), s.lastIndexOf("."));
+  // Último separador seguido de 1–2 dígitos = decimal (350000.00, 350.000,00, 1,234.56); demais são milhar (350.000).
+  const dec = ul >= 0 && s.length - ul - 1 <= 2 ? ul : -1;
+  const n = dec >= 0 ? Number(s.slice(0, dec).replace(/[.,]/g, "") + "." + s.slice(dec + 1)) : Number(s.replace(/[.,]/g, ""));
+  return (neg ? -n : n) || 0;
 }
 
 export async function importarPrevisoes(f: File): Promise<number> {
@@ -43,7 +54,7 @@ export async function importarPrevisoes(f: File): Promise<number> {
       contraparte: String(pega(r, "cliente/fornecedor", "cliente fornecedor", "contraparte", "fornecedor", "cliente", "favorecido")).trim(),
       documento: String(pega(r, "no documento", "nº documento", "n documento", "documento")).trim(),
       banco: String(pega(r, "conta", "banco")), categoria: String(pega(r, "categoria financeira", "categoria")),
-      marcador: String(pega(r, "marcador", "marcadores", "tag", "etiqueta")).trim(),
+      marcador: pegaMarcador(r),
     }];
   });
   if (!novos.length) throw new Error("Nenhuma linha válida. Confira as colunas Data vencimento e Valor título.");
