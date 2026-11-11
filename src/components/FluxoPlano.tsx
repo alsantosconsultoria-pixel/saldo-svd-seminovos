@@ -7,7 +7,7 @@ import type { LinhaPlano } from "@/lib/plano";
 
 const n = (v: number) => (v ? fmt(v).replace("R$", "").trim() : "—");
 
-export function FluxoPlano({ linhas, periodo, abertos, setAbertos, semSaldo = false, marcados, onComposicao }: { linhas: LinhaPlano[]; periodo: DiaFluxo[]; semSaldo?: boolean; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number>; onComposicao?: (id: string, rotulo: string) => void }) {
+export function FluxoPlano({ linhas, periodo, abertos, setAbertos, semSaldo = false, marcados, onComposicao }: { linhas: LinhaPlano[]; periodo: DiaFluxo[]; semSaldo?: boolean; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number> | undefined; onComposicao?: ((id: string, rotulo: string) => void) | undefined }) {
   const rolo = useRef<HTMLDivElement>(null);
   const rolar = (d: number) => rolo.current?.scrollBy({ left: d * Math.max(240, (rolo.current.clientWidth || 600) * 0.7), behavior: "smooth" });
   const alternar = (id: string) => { const s = new Set(abertos); if (s.has(id)) s.delete(id); else s.add(id); setAbertos(s); };

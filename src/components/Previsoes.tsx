@@ -192,7 +192,7 @@ function Curva({ periodo }: { periodo: DiaFluxo[] }) {
 }
 
 
-function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, plano, abertos, setAbertos, marcados, onComposicao }: { periodo: DiaFluxo[]; saldoBancos: number; base: string; receber: number; pagar: number; maiores: Prev[]; plano: LinhaPlano[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number>; onComposicao?: (id: string, rotulo: string) => void }) {
+function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, plano, abertos, setAbertos, marcados, onComposicao }: { periodo: DiaFluxo[]; saldoBancos: number; base: string; receber: number; pagar: number; maiores: Prev[]; plano: LinhaPlano[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number> | undefined; onComposicao?: ((id: string, rotulo: string) => void) | undefined }) {
   const final = periodo.at(-1)?.final ?? saldoBancos;
   const menor = periodo.reduce((m, d) => (d.final < m.final ? d : m), periodo[0]!);
   const criticos = periodo.filter((d) => d.faltante > 0);
