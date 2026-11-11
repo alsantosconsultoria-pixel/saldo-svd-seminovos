@@ -91,7 +91,10 @@ export function useExtratos() {
     const { error } = await supabase
       .from("extratos")
       .upsert({ id: e.id, user_id: sessao.user.id, dados: JSON.parse(JSON.stringify(e)), atualizado_em: new Date().toISOString() });
-    if (error) console.error("Falha ao sincronizar extrato", error);
+    if (error) {
+      console.error("Falha ao sincronizar extrato", error);
+      if (typeof window !== "undefined") window.alert(`Não foi possível salvar o extrato ${e.banco} na nuvem: ${error.message}`);
+    }
   }, []);
 
   const add = useCallback(
@@ -99,10 +102,11 @@ export function useExtratos() {
       setLista((l) => {
         const nova = mesclar(l, e);
         if (!aplicandoRemoto.current) {
-          // mesclar pode fundir em conta existente: grava a conta resultante
-          const alvo = nova.find((x) => x.id === e.id) ?? nova.find((x) => !l.some((o) => o.id === x.id));
-          const antes = l.find((x) => x.id === alvo?.id);
-          if (alvo && JSON.stringify(antes) !== JSON.stringify(alvo)) void subir(alvo);
+          // grava toda conta nova ou alterada (inclusive extrato fundido em conta existente)
+          nova.forEach((x) => {
+            const antes = l.find((o) => o.id === x.id);
+            if (!antes || JSON.stringify(antes) !== JSON.stringify(x)) void subir(x);
+          });
         }
         return nova;
       }),
