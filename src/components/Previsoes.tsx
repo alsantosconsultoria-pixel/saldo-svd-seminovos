@@ -132,7 +132,10 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
       )}
 
       <Card className="p-5">
-        <h3 className="mb-3 font-semibold">Realizado por data</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold">Realizado por data</h3>
+          {diasReal.length > 0 && <Button variant="outline" size="sm" onClick={() => baixarExcelPlano(planoReal, diasReal, abertosReal, `Fluxo de caixa realizado · ${fmtData(diasReal[0]!.data)} a ${fmtData(diasReal.at(-1)!.data)}`, true)}><FileText /> Baixar Excel</Button>}
+        </div>
         {diasReal.length > 0 && <div className="mb-4"><FluxoPlano linhas={planoReal} periodo={diasReal} abertos={abertosReal} setAbertos={setAbertosReal} semSaldo /></div>}
         <h4 className="mb-2 text-sm font-medium text-muted-foreground">Composição por dia (clique no valor)</h4>
         <RealizadoLinha realizados={realizados} de={de} ate={ate} />
