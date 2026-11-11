@@ -255,7 +255,7 @@ function RealizadoLinha({ realizados, de, ate }: { realizados: Realizado[]; de: 
         <DialogHeader><DialogTitle>{aberto?.tipo === "pagar" ? "Despesas pagas" : "Receitas recebidas"} em {aberto && fmtData(aberto.data)} · {fmt(comp.reduce((a, r) => a + r.valor, 0))}</DialogTitle></DialogHeader>
         <div className="max-h-[60vh] overflow-auto"><Table>
           <TableHeader><TableRow><TableHead>Cliente/Fornecedor</TableHead><TableHead>Categoria</TableHead><TableHead>Nº documento</TableHead><TableHead>Conta</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
-          <TableBody>{comp.map((r) => <TableRow key={r.id}><TableCell className="whitespace-normal">{r.contraparte || "—"}</TableCell><TableCell className="text-xs">{r.categoria}</TableCell><TableCell className="text-xs">{r.documento}</TableCell><TableCell className="text-xs">{r.conta}</TableCell><TableCell className="num text-right">{fmt(r.valor)}</TableCell></TableRow>)}</TableBody>
+          <TableBody>{comp.map((r) => <TableRow key={r.id}><TableCell className="whitespace-normal"><div>{r.contraparte || "—"}</div>{r.marcador && <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Tag className="size-3" />{r.marcador}</span>}</TableCell><TableCell className="text-xs">{r.categoria}</TableCell><TableCell className="text-xs">{r.documento}</TableCell><TableCell className="text-xs">{r.conta}</TableCell><TableCell className="num text-right">{fmt(r.valor)}</TableCell></TableRow>)}</TableBody>
         </Table></div>
       </DialogContent>
     </Dialog>

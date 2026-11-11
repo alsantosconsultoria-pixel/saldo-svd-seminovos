@@ -15,3 +15,10 @@ describe("Importação de planilha pelo topo e arraste", () => {
     expect(insert).toHaveBeenCalledWith([expect.objectContaining({ tipo: "pagar", vencimento: "2026-10-28", valor: 1.25, contraparte: "Fornecedor", documento: "123" })]);
   });
 });
+import { valor } from "./importar-previsoes";
+describe("Conversão de valores da planilha", () => {
+  it("350000.00 vira 350.000,00", () => expect(valor("350000.00")).toBe(350000));
+  it("350.000,00 continua 350.000,00", () => expect(valor("350.000,00")).toBe(350000));
+  it("350.000 sem centavos é milhar", () => expect(valor("350.000")).toBe(350000));
+  it("1,234.56 formato americano", () => expect(valor("1,234.56")).toBe(1234.56));
+});
