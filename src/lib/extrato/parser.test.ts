@@ -23,14 +23,14 @@ describe("Extrato sem fechamento", () => {
   });
 });
 describe("Itaú aplicação automática", () => {
-  it("usa SDO APLIC AUT MAIS AP quando o saldo da conta vem 1,00", () => {
+  it("soma 1,00 + SDO APLIC AUT MAIS AP quando o saldo da conta vem 1,00", () => {
     const e = parseLinhas([
       [{ x: 0, text: "08/11/2026" }, { x: 50, text: "SALDO ANTERIOR" }, { x: 400, text: "37.832,33" }],
       [{ x: 0, text: "09/11/2026" }, { x: 50, text: "PIX ENVIADO" }, { x: 300, text: "-60.848,00" }],
       [{ x: 0, text: "09/11/2026" }, { x: 50, text: "SALDO MOVIMENTAÇÃO CONTA" }, { x: 400, text: "1,00" }],
       [{ x: 0, text: "09/11/2026" }, { x: 50, text: "SDO APLIC AUT MAIS AP" }, { x: 400, text: "26.743,05" }],
     ], "itau.pdf");
-    expect(e.saldoFinalInformado).toBe(26743.05);
+    expect(e.saldoFinalInformado).toBe(26744.05);
     expect(e.transacoes.some((t) => t.descricao.includes("SDO APLIC"))).toBe(false);
   });
 });

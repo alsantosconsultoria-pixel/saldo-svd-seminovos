@@ -184,13 +184,13 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
       }
       return;
     }
-    // Itaú: sobra aplicada automaticamente (saldo 1,00) → vale o "SDO APLIC AUT MAIS AP" da linha seguinte
+    // Itaú: sobra aplicada automaticamente (saldo 1,00) → soma o "SDO APLIC AUT MAIS AP" da linha seguinte
     if (/^SDO APLIC AUT/.test(up)) {
       if (!modoFuturo) {
         const ant = saldos.at(-1);
         if (ant && ant.data === data && Math.abs(ant.saldo - 1) < 0.005) {
-          ant.saldo = ultimo;
-          saldoFinal = ultimo;
+          ant.saldo = Math.round((ant.saldo + ultimo) * 100) / 100;
+          saldoFinal = ant.saldo;
         }
       }
       return;
