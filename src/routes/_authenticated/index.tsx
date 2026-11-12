@@ -123,8 +123,6 @@ function Index() {
   const saldosAtuais = ativos.map(ultimoSaldoExtrato);
   const saldoFim = painelAte ? ativos.reduce((a, e) => a + (saldoNaData(e, painelAte)?.saldo ?? 0), 0) : saldosAtuais.reduce((a, s) => a + s.saldo, 0);
   const saldoParcial = saldosAtuais.some((s) => s.parcial);
-  const totE = transacoes.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
-  const totS = transacoes.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
 
   // lançamentos: filtro por período + totais do período filtrado
   const noPeriodo = (d: string) => (!lancDe || d >= lancDe) && (!lancAte || d <= lancAte);
@@ -140,27 +138,11 @@ function Index() {
   // painel: categorias e maiores lançamentos vêm da base do realizado, no período do filtro
   const realPainel = useMemo(() => realizados.filter((r) => (!painelDe || r.data >= painelDe) && (!painelAte || r.data <= painelAte)), [realizados, painelDe, painelAte]);
   const ultimoRealizado = realizados.reduce((m, r) => (r.data > m ? r.data : m), "");
-  const cats = useMemo(() => {
-    const m = new Map<string, { cat: string; entradas: number; saidas: number }>();
-    realPainel.forEach((r) => {
-      const c = r.categoria || "Sem categoria";
-      const x = m.get(c) ?? { cat: c, entradas: 0, saidas: 0 };
-      if (r.tipo === "receber") x.entradas += r.valor; else x.saidas += r.valor;
-      m.set(c, x);
-    });
-    return [...m.values()].sort((a, b) => b.saidas + b.entradas - (a.saidas + a.entradas));
-  }, [realPainel]);
-
   const hojeIso = new Date().toISOString().slice(0, 10);
   // futuros só aparecem enquanto a data prevista ainda não chegou; débitos só contam quando saem no extrato
   const futuros = ativos.flatMap((e) => (e.futuros ?? []).filter((t) => t.data > hojeIso).map((t) => ({ ...t, banco: e.banco })));
   const futReceber = futuros.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
-  const topReal = [...realPainel].filter((r) => r.tipo === "pagar").sort((a, b) => b.valor - a.valor).slice(0, 8);
-  const topSaidas = topReal.map((r) => ({ id: r.id, data: r.data, descricao: r.descricao, contraparte: r.contraparte, valor: r.valor, tipo: "D", banco: r.conta, conta: r.conta })) as unknown as Parameters<typeof RelatorioPainel>[0]["maioresSaidas"];
-  const catEntradas = cats.reduce((a, c) => a + c.entradas, 0);
-  const catSaidas = cats.reduce((a, c) => a + c.saidas, 0);
-  const topTotal = topReal.reduce((a, r) => a + r.valor, 0);
 
   // plano financeiro + previsões para o painel e o forecast
   const [planoContas, setPlanoContas] = useState<ContaPlano[]>([]);
