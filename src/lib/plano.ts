@@ -52,3 +52,23 @@ function soma(l: { cent: number[] }[], n: number) {
 function linha(id: string, rotulo: string, c: number[], filhos: (LinhaPlano & { cent: number[] })[], ordem = "") {
   return { id, rotulo, cent: c, ordem, valores: c.map((x) => x / 100), total: c.reduce((a, b) => a + b, 0) / 100, filhos };
 }
+
+// Totais por conta do plano (sem dias): mesma árvore Receita/Despesa → conta → categoria.
+export function totaisPorPlano(itens: ItemPlano[], contas: ContaPlano[], mapa: Record<string, string>): LinhaPlano[] {
+  return fluxoPorPlano(itens, ["~"], contas, mapa, "~");
+}
+
+// Id da linha de categoria usado pela árvore do plano (para abrir a composição).
+export function idLinhaPlano(tipo: string, categoria: string, contas: ContaPlano[], mapa: Record<string, string>) {
+  const cat = categoria || "Sem categoria";
+  const c = contas.find((x) => x.id === mapa[cat]);
+  return `${tipo === "receber" ? "credito" : "debito"}|${c ? c.nome.trim() : "_sem"}|${cat}`;
+}
+
+// Forecast: realizado até o corte (inclusive) e previsões depois do corte.
+export function itensForecast(realizados: { tipo: string; data: string; categoria: string; valor: number }[], previsoes: ItemPlano[], corte: string): ItemPlano[] {
+  return [
+    ...realizados.filter((r) => r.data <= corte).map((r) => ({ tipo: r.tipo, vencimento: r.data, categoria: r.categoria, valor: r.valor })),
+    ...previsoes.filter((p) => p.vencimento > corte),
+  ];
+}

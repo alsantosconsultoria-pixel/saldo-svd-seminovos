@@ -16,3 +16,21 @@ describe("fluxoPorPlano", () => {
     expect(cred!.valores).toEqual([3, 0]); // vencido entra hoje
   });
 });
+
+describe("forecast do painel", () => {
+  const contas = [{ id: "a", codigo: "2.1", nome: "Impostos", tipo: "debito" as const }];
+  it("realizado até o corte e previsões só depois do corte", async () => {
+    const { itensForecast } = await import("./plano");
+    const r = itensForecast(
+      [{ tipo: "pagar", data: "2026-11-10", categoria: "ICMS", valor: 10 }, { tipo: "pagar", data: "2026-11-13", categoria: "ICMS", valor: 99 }],
+      [{ tipo: "pagar", vencimento: "2026-11-12", categoria: "ICMS", valor: 1 }, { tipo: "pagar", vencimento: "2026-11-13", categoria: "ICMS", valor: 5 }],
+      "2026-11-12",
+    );
+    expect(r.map((i) => i.valor)).toEqual([10, 5]);
+  });
+  it("totais por conta somam tudo sem dias", async () => {
+    const { totaisPorPlano } = await import("./plano");
+    const [, deb] = totaisPorPlano([{ tipo: "pagar", vencimento: "2026-01-01", categoria: "ICMS", valor: 10 }, { tipo: "pagar", vencimento: "2026-12-01", categoria: "ICMS", valor: 5 }], contas, { ICMS: "a" });
+    expect(deb!.filhos[0]).toMatchObject({ rotulo: "Impostos", total: 15 });
+  });
+});

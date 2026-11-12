@@ -20,6 +20,9 @@ import { TabelaLancamentos } from "@/components/TabelaLancamentos";
 import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
+import { ResumoPlano } from "@/components/ResumoPlano";
+import { fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
+import type { DiaFluxo } from "@/lib/fluxo";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { souAdmin } from "@/lib/admin.functions";
@@ -46,10 +49,7 @@ export const Route = createFileRoute("/_authenticated/")({
 const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.conta}`;
 
 // Painel: primeiro os saldos; o clique abre o detalhe (categorias, maiores saídas ou um lançamento).
-type VistaPainel =
-  | { tipo: "categorias" }
-  | { tipo: "maiores" }
-  | { tipo: "composicao"; titulo: string; itens: Realizado[]; volta: "categorias" | "maiores" };
+type VistaPainel = { tipo: "composicao"; titulo: string; itens: Realizado[] };
 
 function Index() {
   const { lista, add, remove, reset } = useExtratos();
@@ -123,8 +123,6 @@ function Index() {
   const saldosAtuais = ativos.map(ultimoSaldoExtrato);
   const saldoFim = painelAte ? ativos.reduce((a, e) => a + (saldoNaData(e, painelAte)?.saldo ?? 0), 0) : saldosAtuais.reduce((a, s) => a + s.saldo, 0);
   const saldoParcial = saldosAtuais.some((s) => s.parcial);
-  const totE = transacoes.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
-  const totS = transacoes.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
 
   // lançamentos: filtro por período + totais do período filtrado
   const noPeriodo = (d: string) => (!lancDe || d >= lancDe) && (!lancAte || d <= lancAte);
@@ -140,27 +138,56 @@ function Index() {
   // painel: categorias e maiores lançamentos vêm da base do realizado, no período do filtro
   const realPainel = useMemo(() => realizados.filter((r) => (!painelDe || r.data >= painelDe) && (!painelAte || r.data <= painelAte)), [realizados, painelDe, painelAte]);
   const ultimoRealizado = realizados.reduce((m, r) => (r.data > m ? r.data : m), "");
-  const cats = useMemo(() => {
-    const m = new Map<string, { cat: string; entradas: number; saidas: number }>();
-    realPainel.forEach((r) => {
-      const c = r.categoria || "Sem categoria";
-      const x = m.get(c) ?? { cat: c, entradas: 0, saidas: 0 };
-      if (r.tipo === "receber") x.entradas += r.valor; else x.saidas += r.valor;
-      m.set(c, x);
-    });
-    return [...m.values()].sort((a, b) => b.saidas + b.entradas - (a.saidas + a.entradas));
-  }, [realPainel]);
-
   const hojeIso = new Date().toISOString().slice(0, 10);
   // futuros só aparecem enquanto a data prevista ainda não chegou; débitos só contam quando saem no extrato
   const futuros = ativos.flatMap((e) => (e.futuros ?? []).filter((t) => t.data > hojeIso).map((t) => ({ ...t, banco: e.banco })));
   const futReceber = futuros.filter((t) => t.tipo === "C").reduce((a, b) => a + b.valor, 0);
   const futPagar = futuros.filter((t) => t.tipo === "D").reduce((a, b) => a + b.valor, 0);
-  const topReal = [...realPainel].filter((r) => r.tipo === "pagar").sort((a, b) => b.valor - a.valor).slice(0, 8);
-  const topSaidas = topReal.map((r) => ({ id: r.id, data: r.data, descricao: r.descricao, contraparte: r.contraparte, valor: r.valor, tipo: "D", banco: r.conta, conta: r.conta })) as unknown as Parameters<typeof RelatorioPainel>[0]["maioresSaidas"];
-  const catEntradas = cats.reduce((a, c) => a + c.entradas, 0);
-  const catSaidas = cats.reduce((a, c) => a + c.saidas, 0);
-  const topTotal = topReal.reduce((a, r) => a + r.valor, 0);
+
+  // plano financeiro + previsões para o painel e o forecast
+  const [planoContas, setPlanoContas] = useState<ContaPlano[]>([]);
+  const [planoMapa, setPlanoMapa] = useState<Record<string, string>>({});
+  const [prevs, setPrevs] = useState<{ tipo: string; vencimento: string; categoria: string; valor: number }[]>([]);
+  useEffect(() => {
+    const ler = async () => {
+      const [c, m, p] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("tipo,vencimento,categoria,valor")]);
+      setPlanoContas((c.data ?? []) as ContaPlano[]);
+      setPlanoMapa(Object.fromEntries((m.data ?? []).map((x) => [x.categoria, x.conta_id])));
+      setPrevs((p.data ?? []).map((x) => ({ ...x, valor: Number(x.valor) })));
+    };
+    ler();
+    const ch = supabase.channel("painel-plano").on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_categorias" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_contas" }, ler).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [atualizacaoPrevisoes]);
+  const itensReal = realPainel.map((r) => ({ tipo: r.tipo, vencimento: r.data, categoria: r.categoria, valor: r.valor }));
+  const resumoPlano = useMemo(() => totaisPorPlano(itensReal, planoContas, planoMapa), [realPainel, planoContas, planoMapa]); // eslint-disable-line react-hooks/exhaustive-deps
+  const maioresPlano = useMemo(() => [...(resumoPlano[1]?.filhos ?? [])].filter((f) => f.total).sort((a, b) => b.total - a.total).slice(0, 8), [resumoPlano]);
+  const maioresTotal = maioresPlano.reduce((a, f) => a + f.total, 0);
+  const abrirCategoria = (id: string, rotulo: string) => setVista({ tipo: "composicao", titulo: rotulo, itens: realPainel.filter((r) => idLinhaPlano(r.tipo, r.categoria, planoContas, planoMapa) === id).sort((a, b) => b.valor - a.valor) });
+  // consolidado (gráficos) respeita o filtro de datas
+  const consolidadoPainel = useMemo(() => consolidado.filter((d) => (!painelDe || d.data >= painelDe) && (!painelAte || d.data <= painelAte)), [consolidado, painelDe, painelAte]);
+  // forecast do relatório: realizado até hoje, previsões depois; período = filtro (ou 14 dias para trás/frente)
+  const somaDias = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const fcDe = painelDe || somaDias(hojeIso, -14);
+  const fcAte = painelAte && painelAte >= fcDe ? painelAte : somaDias(fcDe > hojeIso ? fcDe : hojeIso, 14);
+  const forecast = useMemo(() => {
+    const dias: string[] = [];
+    for (let d = fcDe, i = 0; d <= fcAte && i < 370; d = somaDias(d, 1), i++) dias.push(d);
+    const itens = itensForecast(realizados.filter((r) => r.data >= fcDe && r.data <= fcAte), prevs.filter((p) => p.vencimento >= fcDe && p.vencimento <= fcAte), hojeIso);
+    const linhas = fluxoPorPlano(itens, dias, planoContas, planoMapa, fcDe);
+    const ultExt = ativos.map((e) => ultimoSaldoExtrato(e).data).filter(Boolean).sort().at(-1) ?? "";
+    const saldoBanco = (d: string) => ativos.reduce((a, e) => a + (saldoNaData(e, d)?.saldo ?? e.saldoInicial), 0);
+    let saldo = saldoBanco(diaAntes(fcDe));
+    const ini0 = saldo;
+    const periodo: DiaFluxo[] = dias.map((data, i) => {
+      const r = linhas[0]?.valores[i] ?? 0, p = linhas[1]?.valores[i] ?? 0;
+      const inicial = saldo;
+      saldo = data <= ultExt && data <= hojeIso ? saldoBanco(data) : Math.round((inicial + r - p) * 100) / 100;
+      return { data, inicial, receber: r, pagar: p, final: saldo, faltante: saldo < 0 ? Math.min(-saldo, p) : 0 };
+    });
+    const soma = (t: string, proj: boolean) => itens.filter((x) => x.tipo === t && (x.vencimento > hojeIso) === proj).reduce((a, x) => a + x.valor, 0);
+    return { linhas, periodo, saldoIni: ini0, realE: soma("receber", false), realS: soma("pagar", false), projE: soma("receber", true), projS: soma("pagar", true) };
+  }, [fcDe, fcAte, realizados, prevs, planoContas, planoMapa, ativos, hojeIso]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function importar(files: File[]) {
     if (!files?.length) return;
@@ -346,13 +373,13 @@ function Index() {
                 {relatorioPainel && <><Button onClick={() => window.print()}><Printer /> Imprimir / PDF</Button><CompartilharRelatorio titulo="Demonstrativo gerencial de saldos · Grupo SVD" resumo={`Contas selecionadas: ${ativos.length}. Saldo inicial: ${fmt(saldoIni)}. Saldo final (último dia do extrato): ${fmt(saldoFim)}.`} arquivo={`painel-${hojeIso}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} /></>}
               </div>
             </div>
-            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} consolidado={consolidado} saldoIni={saldoIni} saldoFim={saldoFim} entradas={totE} saidas={totS} categorias={cats} maioresSaidas={topSaidas} /></div>}
+            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} periodo={forecast.periodo} corte={hojeIso} linhas={forecast.linhas} saldoIni={forecast.saldoIni} realE={forecast.realE} realS={forecast.realS} projE={forecast.projE} projS={forecast.projS} maiores={maioresPlano} onCategoria={abrirCategoria} /></div>}
             <div className={`dashboard-editor space-y-4 ${relatorioPainel ? "hidden" : ""}`}>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
                 <h3 className="mb-3 font-semibold">Evolução do saldo consolidado</h3>
                 <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={consolidado}>
+                  <AreaChart data={consolidadoPainel}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="label" fontSize={12} />
                     <YAxis fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
@@ -364,7 +391,7 @@ function Index() {
               <Card className="p-5">
                 <h3 className="mb-3 font-semibold">Entradas × saídas por dia</h3>
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={consolidado}>
+                  <BarChart data={consolidadoPainel}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="label" fontSize={12} />
                     <YAxis fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
@@ -377,75 +404,21 @@ function Index() {
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Por categoria <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
-                {cats.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Importe a planilha de realizado para ver as categorias.</p>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button className="rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary hover:bg-muted" onClick={() => setVista({ tipo: "categorias" })}>
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground">Entradas</p>
-                      <p className="num mt-1 text-2xl font-semibold text-credit">{fmt(catEntradas)}</p>
-                      <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">Abrir categorias <ChevronRight className="size-3" /></p>
-                    </button>
-                    <button className="rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary hover:bg-muted" onClick={() => setVista({ tipo: "categorias" })}>
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground">Saídas</p>
-                      <p className="num mt-1 text-2xl font-semibold text-debit">{fmt(catSaidas)}</p>
-                      <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">Abrir categorias <ChevronRight className="size-3" /></p>
-                    </button>
-                  </div>
-                )}
+                <h3 className="mb-1 font-semibold">Por conta financeira <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
+                <p className="mb-3 text-xs text-muted-foreground">Clique no saldo para abrir as contas e as categorias.</p>
+                {realPainel.length === 0 ? <p className="text-sm text-muted-foreground">Sem realizado no período. Importe a planilha ou ajuste as datas.</p> : <ResumoPlano linhas={resumoPlano} onCategoria={abrirCategoria} />}
               </Card>
               <Card className="p-5">
-                <h3 className="mb-3 font-semibold">Maiores saídas <span className="text-xs font-normal text-muted-foreground">(realizado)</span></h3>
-                {topReal.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Importe a planilha de realizado para ver as maiores saídas.</p>
-                ) : (
-                  <button className="w-full rounded-lg border bg-muted/30 p-4 text-left transition-colors hover:border-primary hover:bg-muted" onClick={() => setVista({ tipo: "maiores" })}>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Total das {topReal.length} maiores saídas</p>
-                    <p className="num mt-1 text-2xl font-semibold text-debit">{fmt(topTotal)}</p>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">Abrir detalhe <ChevronRight className="size-3" /></p>
-                  </button>
-                )}
+                <div className="mb-1 flex items-baseline justify-between gap-2"><h3 className="font-semibold">Maiores saídas <span className="text-xs font-normal text-muted-foreground">(por conta financeira)</span></h3>{maioresPlano.length > 0 && <span className="num text-sm font-semibold text-debit">{fmt(maioresTotal)}</span>}</div>
+                <p className="mb-3 text-xs text-muted-foreground">As {maioresPlano.length || ""} contas com maior saída no período; clique para abrir as categorias.</p>
+                {maioresPlano.length === 0 ? <p className="text-sm text-muted-foreground">Sem saídas realizadas no período.</p> : <ResumoPlano linhas={maioresPlano} onCategoria={abrirCategoria} />}
               </Card>
             </div>
             <Dialog open={!!vista} onOpenChange={(o) => !o && setVista(null)}>
               <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                  <DialogTitle>{vista?.tipo === "categorias" ? "Composição por categoria" : vista?.tipo === "maiores" ? "Maiores saídas do período" : vista?.titulo}</DialogTitle>
+                  <DialogTitle>{vista?.titulo} · <span className="num">{fmt((vista?.itens ?? []).reduce((a, r) => a + r.valor, 0))}</span></DialogTitle>
                 </DialogHeader>
-                {vista?.tipo === "categorias" && (
-                  <div className="max-h-[65vh] overflow-auto">
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Categoria</TableHead><TableHead className="text-right">Entradas</TableHead><TableHead className="text-right">Saídas</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {cats.map((c) => (
-                          <TableRow key={c.cat}>
-                            <TableCell>{c.cat}</TableCell>
-                            <TableCell className="num text-right text-credit">{c.entradas ? <button className="underline-offset-2 hover:underline" onClick={() => setVista({ tipo: "composicao", titulo: `${c.cat} · Entradas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "receber"), volta: "categorias" })}>{fmt(c.entradas)}</button> : "—"}</TableCell>
-                            <TableCell className="num text-right text-debit">{c.saidas ? <button className="underline-offset-2 hover:underline" onClick={() => setVista({ tipo: "composicao", titulo: `${c.cat} · Saídas`, itens: realPainel.filter((r) => (r.categoria || "Sem categoria") === c.cat && r.tipo === "pagar"), volta: "categorias" })}>{fmt(c.saidas)}</button> : "—"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    <p className="mt-3 text-right text-sm font-semibold">Entradas: <span className="num text-credit">{fmt(catEntradas)}</span> · Saídas: <span className="num text-debit">{fmt(catSaidas)}</span></p>
-                  </div>
-                )}
-                {vista?.tipo === "maiores" && (
-                  <div className="max-h-[65vh] overflow-auto">
-                    <Table>
-                      <TableBody>
-                        {topReal.map((r) => (
-                          <TableRow key={r.id}>
-                            <TableCell className="num text-xs text-muted-foreground">{fmtData(r.data)}</TableCell>
-                            <TableCell><div className="text-sm">{r.contraparte || r.descricao}</div><div className="text-xs text-muted-foreground">{r.categoria}</div></TableCell>
-                            <TableCell className="num text-right text-debit"><button className="underline-offset-2 hover:underline" onClick={() => setVista({ tipo: "composicao", titulo: "Lançamento", itens: [r], volta: "maiores" })}>{fmt(r.valor)}</button></TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    <p className="mt-3 text-right text-sm font-semibold">Total: <span className="num">{fmt(topTotal)}</span></p>
-                  </div>
-                )}
                 {vista && vista.tipo === "composicao" && (
                   <>
                     <div className="max-h-[65vh] overflow-auto">
@@ -458,7 +431,7 @@ function Index() {
                       </Table>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <Button variant="ghost" size="sm" onClick={() => setVista({ tipo: vista.volta })}><ArrowLeft /> Voltar</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setVista(null)}><ArrowLeft /> Fechar</Button>
                       <p className="text-sm font-semibold">Total: <span className="num">{fmt(vista.itens.reduce((a, r) => a + r.valor, 0))}</span></p>
                     </div>
                   </>
