@@ -93,6 +93,7 @@
 .treasury-report td { white-space: normal; overflow-wrap: anywhere; }
 .treasury-report th { white-space: normal; }
 .treasury-report tr { break-inside: avoid; }
+.treasury-report .fluxo-plano td, .treasury-report .fluxo-plano th { white-space: nowrap; overflow-wrap: normal; }
 .treasury-report .report-approval { break-inside: avoid; }
 main:has(.treasury-presentation) > :not(:has(.treasury-presentation)) { display: none; }
 main:has(.dashboard-presentation) > :not(:has(.dashboard-presentation)) { display: none; }
