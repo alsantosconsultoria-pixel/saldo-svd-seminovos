@@ -7,7 +7,7 @@ import type { LinhaPlano } from "@/lib/plano";
 
 const n = (v: number) => (v ? fmt(v).replace("R$", "").trim() : "—");
 
-export function FluxoPlano({ linhas, periodo, abertos, setAbertos, semSaldo = false, marcados, onComposicao }: { linhas: LinhaPlano[]; periodo: DiaFluxo[]; semSaldo?: boolean; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number> | undefined; onComposicao?: ((id: string, rotulo: string) => void) | undefined }) {
+export function FluxoPlano({ linhas, periodo, abertos, setAbertos, semSaldo = false, marcados, onComposicao, corte }: { corte?: string | undefined; linhas: LinhaPlano[]; periodo: DiaFluxo[]; semSaldo?: boolean; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number> | undefined; onComposicao?: ((id: string, rotulo: string) => void) | undefined }) {
   const rolo = useRef<HTMLDivElement>(null);
   const rolar = (d: number) => rolo.current?.scrollBy({ left: d * Math.max(240, (rolo.current.clientWidth || 600) * 0.7), behavior: "smooth" });
   const alternar = (id: string) => { const s = new Set(abertos); if (s.has(id)) s.delete(id); else s.add(id); setAbertos(s); };
@@ -35,7 +35,7 @@ export function FluxoPlano({ linhas, periodo, abertos, setAbertos, semSaldo = fa
       <Button size="sm" variant="ghost" onClick={() => setAbertos(new Set())}>Fechar todas</Button>
     </div>
     <div className="relative"><button type="button" aria-label="Recuar" onClick={() => rolar(-1)} className="absolute inset-y-0 left-0 z-20 flex w-7 items-center justify-center border-r bg-card/90 text-muted-foreground hover:bg-muted hover:text-foreground print:hidden"><ChevronLeft className="size-4" /></button><button type="button" aria-label="Avançar" onClick={() => rolar(1)} className="absolute inset-y-0 right-0 z-20 flex w-7 items-center justify-center border-l bg-card/90 text-muted-foreground hover:bg-muted hover:text-foreground print:hidden"><ChevronRight className="size-4" /></button><div ref={rolo} className="overflow-x-auto px-7 print:px-0"><table className="w-full border-collapse text-sm">
-      <thead><tr className="border-b-2 border-primary"><th className={rot + " bg-card font-semibold"}>Plano financeiro</th>{periodo.map((d) => <th key={d.data} className={cel + " font-semibold"}>{fmtData(d.data).slice(0, 5)}</th>)}<th className={cel + " font-semibold"}>Total</th></tr></thead>
+      <thead><tr className="border-b-2 border-primary"><th className={rot + " bg-card font-semibold"}>Plano financeiro</th>{periodo.map((d) => <th key={d.data} className={`${cel} font-semibold ${corte && d.data > corte ? "bg-primary/5" : ""}`}>{fmtData(d.data).slice(0, 5)}{corte && <span className={`block text-[9px] font-medium uppercase tracking-wider ${d.data > corte ? "text-primary" : "text-muted-foreground"}`}>{d.data > corte ? "Projetado" : "Realizado"}</span>}</th>)}<th className={cel + " font-semibold"}>Total</th></tr></thead>
       <tbody>
         {!semSaldo && <tr className="border-b"><td className={rot + " font-medium"}>Saldo inicial</td>{periodo.map((d) => <td key={d.data} className={`${cel} ${d.inicial < 0 ? "text-debit" : ""}`}>{n(d.inicial)}</td>)}<td className={cel} /></tr>}
         {linhas.map((l) => <Fragment key={l.id}><Linha l={l} nivel={0} /></Fragment>)}

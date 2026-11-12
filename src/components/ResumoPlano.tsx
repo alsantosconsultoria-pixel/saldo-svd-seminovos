@@ -4,8 +4,8 @@ import { fmt } from "@/lib/extrato/store";
 import type { LinhaPlano } from "@/lib/plano";
 
 // Árvore recolhida: saldo clicável abre as contas/categorias; a categoria abre a composição.
-export function ResumoPlano({ linhas, onCategoria, abrirPrimeiro = false }: { linhas: LinhaPlano[]; onCategoria: (id: string, rotulo: string) => void; abrirPrimeiro?: boolean }) {
-  const [abertos, setAbertos] = useState<Set<string>>(() => new Set(abrirPrimeiro ? [] : []));
+export function ResumoPlano({ linhas, onCategoria }: { linhas: LinhaPlano[]; onCategoria: (id: string, rotulo: string) => void }) {
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const alternar = (id: string) => setAbertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const visiveis = (l: LinhaPlano[]) => l.filter((x) => x.total !== 0);
   const Item = ({ l, nivel }: { l: LinhaPlano; nivel: number }) => {
