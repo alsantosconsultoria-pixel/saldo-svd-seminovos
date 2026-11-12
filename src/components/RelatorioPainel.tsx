@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Landmark } from "lucide-react";
+import { FileSpreadsheet, Landmark } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { baixarExcelForecast } from "@/lib/excel-forecast";
 import { Area, ComposedChart, CartesianGrid, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type Extrato } from "@/lib/extrato/parser";
@@ -33,6 +35,7 @@ export function RelatorioPainel({ contas, periodo, corte, linhas, saldoIni, real
     { t: temProj ? "Saldo projetado" : "Saldo final", v: final, d: fim && fmtData(fim), destaque: true },
   ];
   return <article className="treasury-report bg-card text-card-foreground">
+    <div className="mb-4 flex justify-end print:hidden"><Button variant="outline" size="sm" disabled={!periodo.length} onClick={() => void baixarExcelForecast(linhas, periodo, abertos, { titulo: "Demonstrativo gerencial · Forecast", subtitulo: `Período ${inicio ? fmtData(inicio) : ""} a ${fim ? fmtData(fim) : ""} · realizado até ${fmtData(corte)} · ${contas.length} contas bancárias`, corte, kpis: kpis.map((k) => ({ t: k.t, v: k.v })), arquivo: `relatorio-gerencial-${inicio ?? ""}-a-${fim ?? ""}.xlsx` })}><FileSpreadsheet /> Baixar Excel</Button></div>
     <header className="flex flex-wrap items-start justify-between gap-5 border-b-2 border-primary pb-7">
       <div><div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary"><Landmark className="size-4" /> Financeiro SVD SEMINOVOS · Grupo SVD</div><h2 className="text-3xl font-semibold leading-tight">Demonstrativo gerencial · Forecast</h2><p className="mt-2 text-sm text-muted-foreground">Realizado e projeção por plano financeiro</p></div>
       <div className="sm:text-right"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Período</p><p className="num mt-1 text-lg font-semibold">{inicio && fim ? `${fmtData(inicio)} a ${fmtData(fim)}` : "—"}</p><p className="mt-2 text-xs text-muted-foreground">Realizado até {fmtData(corte)} · {contas.length} contas bancárias</p></div>
