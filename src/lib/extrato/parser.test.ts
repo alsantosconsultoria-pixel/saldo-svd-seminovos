@@ -34,3 +34,16 @@ describe("Itaú aplicação automática", () => {
     expect(e.transacoes.some((t) => t.descricao.includes("SDO APLIC"))).toBe(false);
   });
 });
+describe("Santander ordem decrescente", () => {
+  it("inverte a ordem e usa Saldo de ContaMax como saldo final", () => {
+    const e = parseLinhas([
+      [{ x: 0, text: "Santander" }],
+      [{ x: 0, text: "04/11/2026" }, { x: 50, text: "Pgto Tributo" }, { x: 300, text: "-36,54" }, { x: 400, text: "238,07" }],
+      [{ x: 0, text: "04/11/2026" }, { x: 50, text: "Pgto Tributo" }, { x: 300, text: "-36,54" }, { x: 400, text: "274,61" }],
+      [{ x: 200, text: "Saldo de ContaMax" }, { x: 400, text: "238,07" }],
+    ], "s.pdf");
+    expect(e.saldoFinalInformado).toBe(238.07);
+    expect(e.saldoInicial).toBe(311.15);
+    expect(saldoDiario(e)[0]).toMatchObject({ fechamento: 238.07, ok: true });
+  });
+});

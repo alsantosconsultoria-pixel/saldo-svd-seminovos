@@ -132,11 +132,18 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
   let saldoFinal: number | null = null;
   let modoFuturo = false;
   let dataPendente: string | null = null; // data em linha própria (layout Caixa)
+  let contaMax: number | null = null; // Santander: "Saldo de ContaMax" é o saldo final
+  const linhaSaldo: { t: Transacao; saldo: number }[] = [];
 
   const isDataLinha = (l: Linha) => RE_DATA.test(tokens(l)[0]?.text ?? "");
 
   linhas.forEach((linha, i) => {
     const txt = textoLinhas[i]!.toUpperCase();
+    if (/SALDO DE CONTAMAX/.test(txt)) {
+      const v = tokens(linha).filter((t) => RE_VALOR.test(t.text));
+      if (v.length) contaMax = brl(v.at(-1)!.text);
+      return;
+    }
     if (/LAN[ÇC]AMENTOS FUTUROS/.test(txt)) modoFuturo = true;
     let tk = tokens(linha);
     if (!tk.length) return;
@@ -218,6 +225,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
     }
     tx.push(t);
     if (valores.length > 1) {
+      linhaSaldo.push({ t, saldo: ultimo });
       saldos.push({ data, saldo: ultimo });
       saldoFinal = ultimo;
     }
@@ -238,9 +246,27 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
     });
   }
 
-  // sem saldo inicial explícito: deduz pelo primeiro saldo informado
+  // extrato em ordem decrescente (mais recentes em cima): inverte quando a cadeia de saldos confirma
+  const c = (n: number) => Math.round(n * 100);
+  const sv = (t: Transacao) => (t.tipo === "C" ? t.valor : -t.valor);
+  const desc = linhaSaldo.length > 1 && linhaSaldo.every((x, k) => k === 0 || (x.t.data <= linhaSaldo[k - 1]!.t.data &&
+    c(linhaSaldo[k - 1]!.saldo) === c(x.saldo + sv(linhaSaldo[k - 1]!.t))));
+  const asc = linhaSaldo.every((x, k) => k === 0 || c(x.saldo) === c(linhaSaldo[k - 1]!.saldo + sv(x.t)));
+  if (desc && !asc) {
+    tx.reverse();
+    saldos.reverse();
+    if (saldos.length) saldoFinal = saldos.at(-1)!.saldo;
+  }
+  if (contaMax !== null) {
+    const ultimaData = saldos.at(-1)?.data ?? tx.map((t) => t.data).sort().at(-1);
+    if (ultimaData) saldos.push({ data: ultimaData, saldo: contaMax });
+    saldoFinal = contaMax;
+  }
+
+  // sem saldo inicial explícito: deduz pelo fechamento do primeiro dia informado
   if (saldoInicial === null) {
-    const primeiro = saldos[0];
+    const d0 = saldos[0]?.data;
+    const primeiro = d0 ? [...saldos].reverse().find((s) => s.data === d0) : undefined;
     if (primeiro) {
       const mov = tx.filter((t) => t.data <= primeiro.data).reduce((a, t) => a + (t.tipo === "C" ? t.valor : -t.valor), 0);
       saldoInicial = tx.length ? Math.round((primeiro.saldo - mov) * 100) / 100 : primeiro.saldo;
