@@ -17,6 +17,7 @@ import { analisarFluxo } from "@/lib/fluxo-ia.functions";
 import { realizadoPorDia, type Realizado } from "@/lib/realizado";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FluxoPlano, baixarExcelPlano } from "@/components/FluxoPlano";
+import { baixarExcelForecast } from "@/lib/excel-forecast";
 import { fluxoPorPlano, type ContaPlano, type LinhaPlano } from "@/lib/plano";
 
 interface Prev { id: string; tipo: string; vencimento: string; descricao: string; contraparte: string; documento: string; banco: string; categoria: string; valor: number; marcador?: string }
@@ -104,7 +105,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setRelatorio((r) => !r)} disabled={!periodo.length}><FileText /> {relatorio ? "Voltar às previsões" : "Relatório de fluxo"}</Button>
-          {relatorio && <Button variant="outline" onClick={() => baixarExcelPlano(plano, periodo, abertos, tituloRel)}><FileText /> Baixar Excel</Button>}
+          {relatorio && <Button variant="outline" onClick={() => void baixarExcelForecast(plano, periodo, abertos, { titulo: tituloRel, arquivo: `fluxo-forecast-${periodo[0]?.data ?? ""}-a-${periodo.at(-1)?.data ?? ""}.xlsx` })}><FileText /> Baixar Excel</Button>}
           {relatorio && <Button onClick={() => window.print()}><Printer /> Baixar PDF</Button>}
         </div>
       </Card>
