@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Printer, Stamp, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Plus, Printer, Search, Stamp, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
-import { balancoNaData, despesasAteData, somarValores, ultimoSaldoExtrato } from "@/lib/tratativas";
+import { balancoNaData, despesasAteData, montarPagamentos, somarValores, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
@@ -38,6 +39,12 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [salvando, setSalvando] = useState(false);
   const [link, setLink] = useState("");
   const [gerando, setGerando] = useState(false);
+  const [sel, setSel] = useState<{ desmarcados: string[]; incluidos: string[]; manuais: DespesaRelatorio[] }>({ desmarcados: [], incluidos: [], manuais: [] });
+  const [incluidosRows, setIncluidosRows] = useState<DespesaRelatorio[]>([]);
+  const [busca, setBusca] = useState("");
+  const [achados, setAchados] = useState<DespesaRelatorio[]>([]);
+  const [manualAberto, setManualAberto] = useState(false);
+  const [manual, setManual] = useState({ contraparte: "", vencimento: "", documento: "", valor: "" });
   const [aprovacoes, setAprovacoes] = useState<{ id: string; user_id: string; token: string; decisao: string; aprovado_por: string; ressalvas: string }[]>([]);
 
   // decisões da diretoria somente para a data selecionada
@@ -62,7 +69,9 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
         : supabase.from("previsoes").select("*").eq("tipo", "pagar").eq("vencimento", dia)
       ).order("vencimento").order("contraparte"),
     ]);
-    return { t, p };
+    const s = await supabase.from("tratativa_selecao").select("*").eq("dia", dia).maybeSingle();
+    const inc = s.data?.incluidos?.length ? await supabase.from("previsoes").select("*").in("id", s.data.incluidos) : { data: [] as never[] };
+    return { t, p, s, inc };
   }, [dia, incluirVencidas]);
 
   useEffect(() => {
@@ -70,11 +79,13 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
     setCarregando(true); setErro(false); setTransf([]); setItens([]);
     async function atualizar() {
       try {
-      const { t, p } = await carregar();
+      const { t, p, s, inc } = await carregar();
       if (!ativo) return;
       if (t.error || p.error) { setErro(true); setCarregando(false); return; }
       setTransf((t.data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })));
       setItens((p.data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })));
+      setSel({ desmarcados: s.data?.desmarcados ?? [], incluidos: s.data?.incluidos ?? [], manuais: (s.data?.manuais as unknown as DespesaRelatorio[]) ?? [] });
+      setIncluidosRows((inc.data ?? []).map((r: DespesaRelatorio) => ({ ...r, valor: Number(r.valor) })));
       setErro(false); setCarregando(false);
       } catch {
         if (ativo) { setErro(true); setCarregando(false); }
@@ -84,15 +95,52 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
     void supabase.auth.getUser().then(({ data }) => { if (ativo) setUsuario(data.user?.id ?? ""); });
     const ch = supabase.channel(`tratativas-${dia}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "transferencias" }, atualizar)
-      .on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, atualizar).subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, atualizar)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tratativa_selecao" }, atualizar).subscribe();
     return () => { ativo = false; void supabase.removeChannel(ch); };
   }, [carregar, dia, recarga]);
 
   const linhas = useMemo(() => balancoNaData(lista, transf, dia), [lista, transf, dia]);
-  const despesas = useMemo(() => despesasAteData(itens, dia, incluirVencidas), [itens, dia, incluirVencidas]);
+  const base = useMemo(() => despesasAteData(itens, dia, incluirVencidas), [itens, dia, incluirVencidas]);
+  const selecao = useMemo(() => montarPagamentos(base, incluidosRows, sel.manuais, sel.desmarcados), [base, incluidosRows, sel]);
+  const todas = selecao.todos;
+  const despesas = selecao.selecionados;
+  const marcado = (id: string) => !sel.desmarcados.includes(id);
   const vencidas = despesas.filter((d) => d.vencimento < dia).length;
   const total = somarValores(linhas.map((l) => l.final ?? 0));
-  const pagamentos = somarValores(despesas.map((d) => d.valor));
+  const pagamentos = selecao.total;
+
+  async function salvarSel(novo: typeof sel, rows = incluidosRows) {
+    const anterior = sel, anteriores = incluidosRows;
+    setSel(novo); setIncluidosRows(rows);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error } = await supabase.from("tratativa_selecao").upsert({ dia, desmarcados: novo.desmarcados, incluidos: novo.incluidos, manuais: JSON.parse(JSON.stringify(novo.manuais)), user_id: u.user.id, atualizado_em: new Date().toISOString() });
+    if (error) { setSel(anterior); setIncluidosRows(anteriores); toast.error("Não foi possível salvar a seleção."); }
+  }
+  const alternar = (id: string, v: boolean) => salvarSel({ ...sel, desmarcados: v ? sel.desmarcados.filter((x) => x !== id) : [...sel.desmarcados, id] });
+  const marcarTodos = () => salvarSel({ ...sel, desmarcados: [] });
+  const desmarcarTodos = () => salvarSel({ ...sel, desmarcados: todas.map((d) => d.id) });
+  const retirar = (id: string) => salvarSel({ desmarcados: sel.desmarcados.filter((x) => x !== id), incluidos: sel.incluidos.filter((x) => x !== id), manuais: sel.manuais.filter((m) => m.id !== id) }, incluidosRows.filter((r) => r.id !== id));
+  async function buscar() {
+    const termo = busca.trim().replace(/[%,()]/g, " ");
+    let q = supabase.from("previsoes").select("*").eq("tipo", "pagar").order("vencimento").limit(30);
+    if (termo) q = q.or(`contraparte.ilike.%${termo}%,documento.ilike.%${termo}%,descricao.ilike.%${termo}%,categoria.ilike.%${termo}%`);
+    const { data, error } = await q;
+    if (error) { toast.error("Não foi possível buscar."); return; }
+    const ja = new Set(todas.map((d) => d.id));
+    const lista = (data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })).filter((r) => !ja.has(r.id));
+    setAchados(lista);
+    if (!lista.length) toast.info("Nenhum título encontrado fora deste dia.");
+  }
+  const incluir = (d: DespesaRelatorio) => { setAchados((a) => a.filter((x) => x.id !== d.id)); void salvarSel({ ...sel, incluidos: [...sel.incluidos, d.id] }, [...incluidosRows, d]); };
+  function salvarManual() {
+    const valor = parseValor(manual.valor);
+    if (!manual.contraparte.trim() || !manual.vencimento || valor <= 0) { toast.error("Informe fornecedor, vencimento e valor."); return; }
+    const novo: DespesaRelatorio = { id: `manual-${crypto.randomUUID()}`, tipo: "pagar", vencimento: manual.vencimento, valor, contraparte: manual.contraparte.trim(), documento: manual.documento.trim(), descricao: "Lançamento manual", categoria: "", banco: "" };
+    void salvarSel({ ...sel, manuais: [...sel.manuais, novo] });
+    setManual({ contraparte: "", vencimento: "", documento: "", valor: "" }); setManualAberto(false);
+  }
   const ajustes = somarValores(transf.map((t) => t.valor));
   const incompleto = linhas.some((l) => l.base === null);
   const origemSel = linhas.find((l) => l.e.id === origem);
@@ -186,7 +234,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
         <div className={`treasury-editor space-y-6 ${relatorio ? "hidden" : ""}`}>
           <div className="grid gap-5 border-b pb-6 sm:grid-cols-2 lg:grid-cols-4">
             <Resumo titulo={`Saldo após ajustes${incompleto ? " (parcial)" : ""}`} valor={total} detalhe={`${lista.length} contas bancárias`} />
-            <Resumo titulo="Despesas do dia" valor={pagamentos} detalhe={`${despesas.length} títulos a pagar${vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}`} />
+            <Resumo titulo="Despesas do dia" valor={pagamentos} detalhe={`${despesas.length} de ${todas.length} títulos selecionados${vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}`} />
             <Resumo titulo="Transferências internas" valor={ajustes} detalhe={`${transf.length} ajustes registrados`} />
             <Resumo titulo="Após pagamentos previstos" valor={total - pagamentos} detalhe="Projeção, sem baixa nos bancos" />
           </div>
@@ -210,7 +258,22 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
           </section>
           <section>
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-lg font-semibold">Despesas a pagar</h3><span className="text-sm text-muted-foreground">Vencimento {incluirVencidas ? "até " : "em "}{fmtData(dia)}{vencidas ? ` · ${vencidas} vencido${vencidas > 1 ? "s" : ""}` : ""}</span></div>
-            {despesas.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma despesa com vencimento {incluirVencidas ? "até esta" : "nesta"} data.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Fornecedor / despesa</TableHead><TableHead>Vencimento</TableHead><TableHead>Nº documento</TableHead><TableHead>Banco indicado</TableHead><TableHead className="text-right">Valor do título</TableHead></TableRow></TableHeader><TableBody>{despesas.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.descricao || d.categoria || "—"}</p>{d.vencimento < dia && <p className="mt-1 inline-flex items-center gap-1 border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs font-medium text-debit">Não pago no vencimento</p>}</TableCell><TableCell className="num">{fmtData(d.vencimento)}</TableCell><TableCell>{d.documento || "—"}</TableCell><TableCell>{d.banco || "Não definido"}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell></TableRow>)}</TableBody></Table></div>}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={marcarTodos} disabled={!todas.length}>Marcar todos</Button>
+              <Button size="sm" variant="outline" onClick={desmarcarTodos} disabled={!todas.length}>Desmarcar todos</Button>
+              <Button size="sm" variant="outline" onClick={() => setManualAberto(true)}><Plus /> Despesa manual</Button>
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-md sm:ml-auto"><Input className="h-9" placeholder="Buscar a pagar ou vencido (fornecedor, documento…)" value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void buscar()} aria-label="Buscar títulos na base" /><Button size="sm" onClick={() => void buscar()}><Search /> Buscar</Button></div>
+            </div>
+            {achados.length > 0 && <div className="mb-4 border bg-muted/30 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Títulos encontrados — clique em Incluir para pagar em {fmtData(dia)}</p><Button size="icon" variant="ghost" aria-label="Fechar busca" onClick={() => setAchados([])}><X /></Button></div><div className="max-h-64 overflow-auto"><Table><TableBody>{achados.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.documento || "—"}</p></TableCell><TableCell className={`num ${d.vencimento < dia ? "text-debit" : ""}`}>{fmtData(d.vencimento)}{d.vencimento < dia ? " · vencido" : ""}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell><TableCell className="w-24 text-right"><Button size="sm" variant="outline" onClick={() => incluir(d)}><Plus /> Incluir</Button></TableCell></TableRow>)}</TableBody></Table></div></div>}
+            {todas.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma despesa com vencimento {incluirVencidas ? "até esta" : "nesta"} data.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-10"><Checkbox aria-label="Marcar todos" checked={despesas.length === todas.length ? true : despesas.length ? "indeterminate" : false} onCheckedChange={(v) => (v ? marcarTodos() : desmarcarTodos())} /></TableHead><TableHead>Fornecedor / despesa</TableHead><TableHead>Vencimento</TableHead><TableHead>Nº documento</TableHead><TableHead>Banco indicado</TableHead><TableHead className="text-right">Valor do título</TableHead><TableHead className="w-10" /></TableRow></TableHeader><TableBody>{todas.map((d) => { const extra = sel.incluidos.includes(d.id) || d.id.startsWith("manual-"); return <TableRow key={d.id} className={marcado(d.id) ? "" : "opacity-50"}><TableCell><Checkbox aria-label={`Selecionar ${d.contraparte}`} checked={marcado(d.id)} onCheckedChange={(v) => alternar(d.id, v === true)} /></TableCell><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.descricao || d.categoria || "—"}</p>{d.id.startsWith("manual-") ? <p className="mt-1 text-xs text-muted-foreground">Incluída manualmente</p> : sel.incluidos.includes(d.id) ? <p className="mt-1 text-xs text-muted-foreground">Trazida de {fmtData(d.vencimento)}</p> : null}{d.vencimento < dia && <p className="mt-1 inline-flex items-center gap-1 border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs font-medium text-debit">Não pago no vencimento</p>}</TableCell><TableCell className="num">{fmtData(d.vencimento)}</TableCell><TableCell>{d.documento || "—"}</TableCell><TableCell>{d.banco || "Não definido"}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell><TableCell>{extra && <Button variant="ghost" size="icon" aria-label="Retirar do dia" onClick={() => retirar(d.id)}><Trash2 /></Button>}</TableCell></TableRow>; })}<TableRow className="bg-muted/40 font-semibold"><TableCell /><TableCell colSpan={4}>Total selecionado para pagamento · {despesas.length} de {todas.length}</TableCell><TableCell className="num text-right">{fmt(pagamentos)}</TableCell><TableCell /></TableRow></TableBody></Table></div>}
+            <Dialog open={manualAberto} onOpenChange={setManualAberto}><DialogContent><DialogHeader><DialogTitle>Incluir despesa manual</DialogTitle><DialogDescription>Para títulos que não estão na base. Entra marcada para pagamento em {fmtData(dia)}.</DialogDescription></DialogHeader>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm sm:col-span-2">Fornecedor<Input value={manual.contraparte} onChange={(e) => setManual((m) => ({ ...m, contraparte: e.target.value }))} /></label>
+                <label className="text-sm">Vencimento<Input type="date" value={manual.vencimento} onChange={(e) => setManual((m) => ({ ...m, vencimento: e.target.value }))} /></label>
+                <label className="text-sm">Nº documento<Input value={manual.documento} onChange={(e) => setManual((m) => ({ ...m, documento: e.target.value }))} /></label>
+                <label className="text-sm sm:col-span-2">Valor do título<Input inputMode="decimal" placeholder="0,00" value={manual.valor} onChange={(e) => setManual((m) => ({ ...m, valor: e.target.value }))} /></label>
+              </div>
+              <DialogFooter><Button variant="outline" onClick={() => setManualAberto(false)}>Cancelar</Button><Button onClick={salvarManual}>Incluir</Button></DialogFooter></DialogContent></Dialog>
             <p className="mt-3 text-xs text-muted-foreground">Previsões da planilha, sem baixa nos saldos. {incluirVencidas ? 'Títulos vencidos permanecem na lista até serem pagos, marcados como "não pago no vencimento".' : "Somente títulos com vencimento hoje."}</p>
           </section>
         </div>
