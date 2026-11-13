@@ -62,3 +62,33 @@ export function montarPagamentos<T extends { id: string; valor: number }>(base: 
   const selecionados = todos.filter((d) => !fora.has(d.id));
   return { todos, selecionados, total: somarValores(selecionados.map((d) => d.valor)) };
 }
+
+// ============ Busca de títulos na base ============
+// Cada palavra digitada é um filtro próprio: "Paccar sen4d22" só retorna títulos que tenham as duas.
+const CAMPOS_DE_BUSCA = ["contraparte", "documento", "descricao", "categoria", "banco"] as const;
+type CamposBusca = Partial<Record<(typeof CAMPOS_DE_BUSCA)[number], string | null>>;
+
+export function normalizarBusca(texto: string) {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// Separa o digitado em palavras, descartando símbolos que quebrariam o filtro do banco.
+export function tokensDeBusca(termo: string): string[] {
+  return termo.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+export function textoDeBusca(d: CamposBusca): string {
+  return CAMPOS_DE_BUSCA.map((c) => d[c] ?? "").join(" ");
+}
+
+// Compara sem caixa e sem acentos: "AÇO" encontra "Aço".
+export function contemTodosOsTokens(tokens: string[], texto: string) {
+  const alvo = normalizarBusca(texto);
+  return tokens.length > 0 && tokens.every((t) => alvo.includes(normalizarBusca(t)));
+}
+
+// Filtro enviado ao banco: a primeira palavra já reduz a base; as demais conferem no resultado.
+export function clausulaDeBusca(token: string) {
+  const limpo = token.replace(/[^\p{L}\p{N}]/gu, "");
+  return limpo ? CAMPOS_DE_BUSCA.map((c) => `${c}.ilike.%${limpo}%`).join(",") : "";
+}

@@ -62,7 +62,7 @@ describe("Tratativas por data", () => {
     expect(linhas.reduce((a, l) => a + (l.final ?? 0), 0)).toBe(114.85);
   });
 });
-import { montarPagamentos } from "./tratativas";
+import { clausulaDeBusca, contemTodosOsTokens, montarPagamentos, textoDeBusca, tokensDeBusca } from "./tratativas";
 describe("Seleção de pagamentos", () => {
   const a = { id: "a", valor: 100.1 }, b = { id: "b", valor: 50.2 }, c = { id: "c", valor: 10 }, m = { id: "m", valor: 5.05 };
   it("soma somente os títulos marcados, incluindo os trazidos de outras datas e os manuais", () => {
