@@ -53,3 +53,12 @@ export function ultimoSaldoExtrato(e: Extrato) {
   const informado = e.saldosInformados.some((s) => s.data === data);
   return { saldo: conhecido?.saldo ?? e.saldoInicial, data, parcial: !informado };
 }
+// Seleção de pagamentos do dia: base do dia + títulos trazidos de outras datas + lançamentos manuais.
+// Títulos novos entram marcados; só os marcados compõem o total a pagar.
+export function montarPagamentos<T extends { id: string; valor: number }>(base: T[], incluidos: T[], manuais: T[], desmarcados: string[]) {
+  const vistos = new Set<string>();
+  const todos = [...base, ...incluidos, ...manuais].filter((d) => (vistos.has(d.id) ? false : (vistos.add(d.id), true)));
+  const fora = new Set(desmarcados);
+  const selecionados = todos.filter((d) => !fora.has(d.id));
+  return { todos, selecionados, total: somarValores(selecionados.map((d) => d.valor)) };
+}

@@ -62,3 +62,18 @@ describe("Tratativas por data", () => {
     expect(linhas.reduce((a, l) => a + (l.final ?? 0), 0)).toBe(114.85);
   });
 });
+import { montarPagamentos } from "./tratativas";
+describe("Seleção de pagamentos", () => {
+  const a = { id: "a", valor: 100.1 }, b = { id: "b", valor: 50.2 }, c = { id: "c", valor: 10 }, m = { id: "m", valor: 5.05 };
+  it("soma somente os títulos marcados, incluindo os trazidos de outras datas e os manuais", () => {
+    const r = montarPagamentos([a, b], [c], [m], ["b"]);
+    expect(r.todos.map((d) => d.id)).toEqual(["a", "b", "c", "m"]);
+    expect(r.total).toBe(115.15);
+  });
+  it("não duplica título incluído que já está no dia", () => {
+    expect(montarPagamentos([a], [a], [], []).todos).toHaveLength(1);
+  });
+  it("desmarcar todos zera o total", () => {
+    expect(montarPagamentos([a, b], [], [m], ["a", "b", "m"]).total).toBe(0);
+  });
+});

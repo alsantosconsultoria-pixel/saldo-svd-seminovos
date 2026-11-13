@@ -256,6 +256,33 @@ export type Database = {
         }
         Relationships: []
       }
+      tratativa_selecao: {
+        Row: {
+          atualizado_em: string
+          desmarcados: string[]
+          dia: string
+          incluidos: string[]
+          manuais: Json
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          desmarcados?: string[]
+          dia: string
+          incluidos?: string[]
+          manuais?: Json
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          desmarcados?: string[]
+          dia?: string
+          incluidos?: string[]
+          manuais?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
