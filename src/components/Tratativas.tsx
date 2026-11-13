@@ -128,16 +128,35 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const marcarTodos = () => salvarSel({ ...sel, desmarcados: [] });
   const desmarcarTodos = () => salvarSel({ ...sel, desmarcados: todas.map((d) => d.id) });
   const retirar = (id: string) => salvarSel({ desmarcados: sel.desmarcados.filter((x) => x !== id), incluidos: sel.incluidos.filter((x) => x !== id), manuais: sel.manuais.filter((m) => m.id !== id) }, incluidosRows.filter((r) => r.id !== id));
-  async function buscar() {
-    const termo = busca.trim().replace(/[%,()]/g, " ");
-    let q = supabase.from("previsoes").select("*").eq("tipo", "pagar").order("vencimento").limit(30);
-    if (termo) q = q.or(`contraparte.ilike.%${termo}%,documento.ilike.%${termo}%,descricao.ilike.%${termo}%,categoria.ilike.%${termo}%`);
-    const { data, error } = await q;
-    if (error) { toast.error("Não foi possível buscar."); return; }
-    const ja = new Set(todas.map((d) => d.id));
-    const lista = (data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })).filter((r) => !ja.has(r.id));
-    setAchados(lista);
-    if (!lista.length) toast.info("Nenhum título encontrado fora deste dia.");
+  // Busca ao digitar: o banco filtra pela primeira palavra e as demais conferem no resultado.
+  const executarBusca = useCallback(async (termo: string) => {
+    const meu = ++buscaSeq.current;
+    const tokens = tokensDeBusca(termo);
+    if (!tokens.length) { setAchados([]); setBuscando(false); setBuscaFeita(false); return; }
+    setBuscando(true);
+    const { data, error } = await supabase.from("previsoes").select("*").eq("tipo", "pagar")
+      .or(clausulaDeBusca(tokens[0])).order("vencimento").limit(300);
+    if (meu !== buscaSeq.current) return;
+    setBuscando(false); setBuscaFeita(true);
+    if (error) { setAchados([]); toast.error("Não foi possível buscar."); return; }
+    const ja = idsNoDia.current;
+    const encontrados = (data ?? []).map((r) => ({ ...r, valor: Number(r.valor) }))
+      .filter((r) => !ja.has(r.id) && contemTodosOsTokens(tokens, textoDeBusca(r)))
+      .slice(0, 30);
+    setAchados(encontrados);
+  }, []);
+
+  useEffect(() => {
+    if (buscaTimer.current) clearTimeout(buscaTimer.current);
+    const termo = busca.trim();
+    if (!termo) { buscaSeq.current++; setAchados([]); setBuscando(false); setBuscaFeita(false); return; }
+    buscaTimer.current = setTimeout(() => void executarBusca(termo), 250);
+    return () => { if (buscaTimer.current) clearTimeout(buscaTimer.current); };
+  }, [busca, executarBusca]);
+
+  function buscarAgora() {
+    if (buscaTimer.current) clearTimeout(buscaTimer.current);
+    void executarBusca(busca.trim());
   }
   const incluir = (d: DespesaRelatorio) => { setAchados((a) => a.filter((x) => x.id !== d.id)); void salvarSel({ ...sel, incluidos: [...sel.incluidos, d.id] }, [...incluidosRows, d]); };
   function salvarManual() {
