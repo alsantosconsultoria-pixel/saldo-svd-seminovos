@@ -90,8 +90,10 @@ describe("Busca de títulos ao digitar", () => {
     expect(contemTodosOsTokens(tokensDeBusca("paccar"), textoDeBusca({ ...titulo, contraparte: "" }))).toBe(false);
   });
   it("ignora caixa e acentos na comparação", () => {
-    expect(contemTodosOsTokens(["AÇO"], textoDeBusca({ contraparte: "Aço São Paulo" }))).toBe(true);
-    expect(contemTodosOsTokens(["aco sao"], textoDeBusca({ contraparte: "Aço São Paulo" }))).toBe(false);
+    const texto = textoDeBusca({ contraparte: "Aço São Paulo" });
+    expect(contemTodosOsTokens(["AÇO"], texto)).toBe(true);
+    expect(contemTodosOsTokens(["aco", "sao"], texto)).toBe(true);
+    expect(contemTodosOsTokens(["aco", "rio"], texto)).toBe(false);
   });
   it("a cláusula do banco procura em todos os campos e descarta símbolos", () => {
     expect(clausulaDeBusca("Paccar")).toBe("contraparte.ilike.%Paccar%,documento.ilike.%Paccar%,descricao.ilike.%Paccar%,categoria.ilike.%Paccar%,banco.ilike.%Paccar%");
