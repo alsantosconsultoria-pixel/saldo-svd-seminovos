@@ -77,3 +77,25 @@ describe("Seleção de pagamentos", () => {
     expect(montarPagamentos([a, b], [], [m], ["a", "b", "m"]).total).toBe(0);
   });
 });
+describe("Busca de títulos ao digitar", () => {
+  const titulo = { contraparte: "PACCAR FINANCEIRA", documento: "SEN4D22", descricao: "Financiamento", categoria: "Máquinas", banco: "Itaú" };
+  it("cada palavra digitada precisa aparecer no título", () => {
+    expect(tokensDeBusca("Paccar sen4d22")).toEqual(["Paccar", "sen4d22"]);
+    expect(contemTodosOsTokens(tokensDeBusca("Paccar sen4d22"), textoDeBusca(titulo))).toBe(true);
+    expect(contemTodosOsTokens(tokensDeBusca("Paccar sen9999"), textoDeBusca(titulo))).toBe(false);
+  });
+  it("encontra por fornecedor, documento ou categoria em qualquer ordem", () => {
+    expect(contemTodosOsTokens(tokensDeBusca("sen4d22 paccar"), textoDeBusca(titulo))).toBe(true);
+    expect(contemTodosOsTokens(tokensDeBusca("máquinas financiamento"), textoDeBusca(titulo))).toBe(true);
+    expect(contemTodosOsTokens(tokensDeBusca("paccar"), textoDeBusca({ ...titulo, contraparte: "" }))).toBe(false);
+  });
+  it("ignora caixa e acentos na comparação", () => {
+    expect(contemTodosOsTokens(["AÇO"], textoDeBusca({ contraparte: "Aço São Paulo" }))).toBe(true);
+    expect(contemTodosOsTokens(["aco sao"], textoDeBusca({ contraparte: "Aço São Paulo" }))).toBe(false);
+  });
+  it("a cláusula do banco procura em todos os campos e descarta símbolos", () => {
+    expect(clausulaDeBusca("Paccar")).toBe("contraparte.ilike.%Paccar%,documento.ilike.%Paccar%,descricao.ilike.%Paccar%,categoria.ilike.%Paccar%,banco.ilike.%Paccar%");
+    expect(clausulaDeBusca("Pacc,ar()")).toBe(clausulaDeBusca("Paccar"));
+    expect(clausulaDeBusca("%%")).toBe("");
+  });
+});
