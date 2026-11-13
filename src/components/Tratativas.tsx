@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Plus, Printer, Search, Stamp, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Loader2, Plus, Printer, Search, Stamp, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
-import { balancoNaData, despesasAteData, montarPagamentos, somarValores, ultimoSaldoExtrato } from "@/lib/tratativas";
+import { balancoNaData, clausulaDeBusca, contemTodosOsTokens, despesasAteData, montarPagamentos, somarValores, textoDeBusca, tokensDeBusca, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
@@ -43,6 +43,11 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [incluidosRows, setIncluidosRows] = useState<DespesaRelatorio[]>([]);
   const [busca, setBusca] = useState("");
   const [achados, setAchados] = useState<DespesaRelatorio[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [buscaFeita, setBuscaFeita] = useState(false);
+  const buscaSeq = useRef(0);
+  const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idsNoDia = useRef(new Set<string>());
   const [manualAberto, setManualAberto] = useState(false);
   const [manual, setManual] = useState({ contraparte: "", vencimento: "", documento: "", valor: "" });
   const [aprovacoes, setAprovacoes] = useState<{ id: string; user_id: string; token: string; decisao: string; aprovado_por: string; ressalvas: string }[]>([]);
@@ -104,6 +109,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const base = useMemo(() => despesasAteData(itens, dia, incluirVencidas), [itens, dia, incluirVencidas]);
   const selecao = useMemo(() => montarPagamentos(base, incluidosRows, sel.manuais, sel.desmarcados), [base, incluidosRows, sel]);
   const todas = selecao.todos;
+  idsNoDia.current = new Set(todas.map((d) => d.id));
   const despesas = selecao.selecionados;
   const marcado = (id: string) => !sel.desmarcados.includes(id);
   const vencidas = despesas.filter((d) => d.vencimento < dia).length;
