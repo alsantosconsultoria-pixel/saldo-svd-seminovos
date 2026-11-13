@@ -62,7 +62,7 @@ describe("Tratativas por data", () => {
     expect(linhas.reduce((a, l) => a + (l.final ?? 0), 0)).toBe(114.85);
   });
 });
-import { montarPagamentos } from "./tratativas";
+import { clausulaDeBusca, contemTodosOsTokens, montarPagamentos, textoDeBusca, tokensDeBusca } from "./tratativas";
 describe("Seleção de pagamentos", () => {
   const a = { id: "a", valor: 100.1 }, b = { id: "b", valor: 50.2 }, c = { id: "c", valor: 10 }, m = { id: "m", valor: 5.05 };
   it("soma somente os títulos marcados, incluindo os trazidos de outras datas e os manuais", () => {
@@ -75,5 +75,29 @@ describe("Seleção de pagamentos", () => {
   });
   it("desmarcar todos zera o total", () => {
     expect(montarPagamentos([a, b], [], [m], ["a", "b", "m"]).total).toBe(0);
+  });
+});
+describe("Busca de títulos ao digitar", () => {
+  const titulo = { contraparte: "PACCAR FINANCEIRA", documento: "SEN4D22", descricao: "Financiamento", categoria: "Máquinas", banco: "Itaú" };
+  it("cada palavra digitada precisa aparecer no título", () => {
+    expect(tokensDeBusca("Paccar sen4d22")).toEqual(["Paccar", "sen4d22"]);
+    expect(contemTodosOsTokens(tokensDeBusca("Paccar sen4d22"), textoDeBusca(titulo))).toBe(true);
+    expect(contemTodosOsTokens(tokensDeBusca("Paccar sen9999"), textoDeBusca(titulo))).toBe(false);
+  });
+  it("encontra por fornecedor, documento ou categoria em qualquer ordem", () => {
+    expect(contemTodosOsTokens(tokensDeBusca("sen4d22 paccar"), textoDeBusca(titulo))).toBe(true);
+    expect(contemTodosOsTokens(tokensDeBusca("máquinas financiamento"), textoDeBusca(titulo))).toBe(true);
+    expect(contemTodosOsTokens(tokensDeBusca("paccar"), textoDeBusca({ ...titulo, contraparte: "" }))).toBe(false);
+  });
+  it("ignora caixa e acentos na comparação", () => {
+    const texto = textoDeBusca({ contraparte: "Aço São Paulo" });
+    expect(contemTodosOsTokens(["AÇO"], texto)).toBe(true);
+    expect(contemTodosOsTokens(["aco", "sao"], texto)).toBe(true);
+    expect(contemTodosOsTokens(["aco", "rio"], texto)).toBe(false);
+  });
+  it("a cláusula do banco procura em todos os campos e descarta símbolos", () => {
+    expect(clausulaDeBusca("Paccar")).toBe("contraparte.ilike.%Paccar%,documento.ilike.%Paccar%,descricao.ilike.%Paccar%,categoria.ilike.%Paccar%,banco.ilike.%Paccar%");
+    expect(clausulaDeBusca("Pacc,ar()")).toBe(clausulaDeBusca("Paccar"));
+    expect(clausulaDeBusca("%%")).toBe("");
   });
 });

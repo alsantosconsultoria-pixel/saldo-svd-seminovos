@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Plus, Printer, Search, Stamp, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Loader2, Plus, Printer, Search, Stamp, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
-import { balancoNaData, despesasAteData, montarPagamentos, somarValores, ultimoSaldoExtrato } from "@/lib/tratativas";
+import { balancoNaData, clausulaDeBusca, contemTodosOsTokens, despesasAteData, montarPagamentos, somarValores, textoDeBusca, tokensDeBusca, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 
@@ -43,6 +43,11 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const [incluidosRows, setIncluidosRows] = useState<DespesaRelatorio[]>([]);
   const [busca, setBusca] = useState("");
   const [achados, setAchados] = useState<DespesaRelatorio[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [buscaFeita, setBuscaFeita] = useState(false);
+  const buscaSeq = useRef(0);
+  const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idsNoDia = useRef(new Set<string>());
   const [manualAberto, setManualAberto] = useState(false);
   const [manual, setManual] = useState({ contraparte: "", vencimento: "", documento: "", valor: "" });
   const [aprovacoes, setAprovacoes] = useState<{ id: string; user_id: string; token: string; decisao: string; aprovado_por: string; ressalvas: string }[]>([]);
@@ -104,6 +109,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const base = useMemo(() => despesasAteData(itens, dia, incluirVencidas), [itens, dia, incluirVencidas]);
   const selecao = useMemo(() => montarPagamentos(base, incluidosRows, sel.manuais, sel.desmarcados), [base, incluidosRows, sel]);
   const todas = selecao.todos;
+  idsNoDia.current = new Set(todas.map((d) => d.id));
   const despesas = selecao.selecionados;
   const marcado = (id: string) => !sel.desmarcados.includes(id);
   const vencidas = despesas.filter((d) => d.vencimento < dia).length;
@@ -122,16 +128,35 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const marcarTodos = () => salvarSel({ ...sel, desmarcados: [] });
   const desmarcarTodos = () => salvarSel({ ...sel, desmarcados: todas.map((d) => d.id) });
   const retirar = (id: string) => salvarSel({ desmarcados: sel.desmarcados.filter((x) => x !== id), incluidos: sel.incluidos.filter((x) => x !== id), manuais: sel.manuais.filter((m) => m.id !== id) }, incluidosRows.filter((r) => r.id !== id));
-  async function buscar() {
-    const termo = busca.trim().replace(/[%,()]/g, " ");
-    let q = supabase.from("previsoes").select("*").eq("tipo", "pagar").order("vencimento").limit(30);
-    if (termo) q = q.or(`contraparte.ilike.%${termo}%,documento.ilike.%${termo}%,descricao.ilike.%${termo}%,categoria.ilike.%${termo}%`);
-    const { data, error } = await q;
-    if (error) { toast.error("Não foi possível buscar."); return; }
-    const ja = new Set(todas.map((d) => d.id));
-    const lista = (data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })).filter((r) => !ja.has(r.id));
-    setAchados(lista);
-    if (!lista.length) toast.info("Nenhum título encontrado fora deste dia.");
+  // Busca ao digitar: o banco filtra pela primeira palavra e as demais conferem no resultado.
+  const executarBusca = useCallback(async (termo: string) => {
+    const meu = ++buscaSeq.current;
+    const tokens = tokensDeBusca(termo);
+    if (!tokens.length) { setAchados([]); setBuscando(false); setBuscaFeita(false); return; }
+    setBuscando(true);
+    const { data, error } = await supabase.from("previsoes").select("*").eq("tipo", "pagar")
+      .or(clausulaDeBusca(tokens[0])).order("vencimento").limit(300);
+    if (meu !== buscaSeq.current) return;
+    setBuscando(false); setBuscaFeita(true);
+    if (error) { setAchados([]); toast.error("Não foi possível buscar."); return; }
+    const ja = idsNoDia.current;
+    const encontrados = (data ?? []).map((r) => ({ ...r, valor: Number(r.valor) }))
+      .filter((r) => !ja.has(r.id) && contemTodosOsTokens(tokens, textoDeBusca(r)))
+      .slice(0, 30);
+    setAchados(encontrados);
+  }, []);
+
+  useEffect(() => {
+    if (buscaTimer.current) clearTimeout(buscaTimer.current);
+    const termo = busca.trim();
+    if (!termo) { buscaSeq.current++; setAchados([]); setBuscando(false); setBuscaFeita(false); return; }
+    buscaTimer.current = setTimeout(() => void executarBusca(termo), 250);
+    return () => { if (buscaTimer.current) clearTimeout(buscaTimer.current); };
+  }, [busca, executarBusca]);
+
+  function buscarAgora() {
+    if (buscaTimer.current) clearTimeout(buscaTimer.current);
+    void executarBusca(busca.trim());
   }
   const incluir = (d: DespesaRelatorio) => { setAchados((a) => a.filter((x) => x.id !== d.id)); void salvarSel({ ...sel, incluidos: [...sel.incluidos, d.id] }, [...incluidosRows, d]); };
   function salvarManual() {
@@ -262,9 +287,16 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
               <Button size="sm" variant="outline" onClick={marcarTodos} disabled={!todas.length}>Marcar todos</Button>
               <Button size="sm" variant="outline" onClick={desmarcarTodos} disabled={!todas.length}>Desmarcar todos</Button>
               <Button size="sm" variant="outline" onClick={() => setManualAberto(true)}><Plus /> Despesa manual</Button>
-              <div className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-md sm:ml-auto"><Input className="h-9" placeholder="Buscar a pagar ou vencido (fornecedor, documento…)" value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void buscar()} aria-label="Buscar títulos na base" /><Button size="sm" onClick={() => void buscar()}><Search /> Buscar</Button></div>
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-md sm:ml-auto">
+                <div className="relative min-w-0 flex-1">
+                  <Input className="h-9 pr-8" placeholder="Buscar a pagar ou vencido — digite fornecedor, documento…" value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => e.key === "Enter" && buscarAgora()} aria-label="Buscar títulos na base" />
+                  {busca && <Button size="icon" variant="ghost" className="absolute right-0.5 top-1/2 size-7 -translate-y-1/2 text-muted-foreground" aria-label="Limpar busca" onClick={() => setBusca("")}><X className="size-4" /></Button>}
+                </div>
+                <Button size="sm" onClick={buscarAgora}><Search /> Buscar</Button>
+              </div>
             </div>
-            {achados.length > 0 && <div className="mb-4 border bg-muted/30 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Títulos encontrados — clique em Incluir para pagar em {fmtData(dia)}</p><Button size="icon" variant="ghost" aria-label="Fechar busca" onClick={() => setAchados([])}><X /></Button></div><div className="max-h-64 overflow-auto"><Table><TableBody>{achados.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.documento || "—"}</p></TableCell><TableCell className={`num ${d.vencimento < dia ? "text-debit" : ""}`}>{fmtData(d.vencimento)}{d.vencimento < dia ? " · vencido" : ""}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell><TableCell className="w-24 text-right"><Button size="sm" variant="outline" onClick={() => incluir(d)}><Plus /> Incluir</Button></TableCell></TableRow>)}</TableBody></Table></div></div>}
+            {busca.trim() && !achados.length && <p role="status" className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">{buscando ? <><Loader2 className="size-4 animate-spin" /> Buscando títulos…</> : buscaFeita ? <>Nenhum título encontrado para <b className="font-medium text-foreground">“{busca.trim()}”</b>.</> : null}</p>}
+            {achados.length > 0 && <div className="mb-4 border bg-muted/30 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Títulos encontrados ({achados.length}) — clique em Incluir para pagar em {fmtData(dia)}</p><Button size="icon" variant="ghost" aria-label="Fechar busca" onClick={() => setAchados([])}><X /></Button></div><div className="max-h-64 overflow-auto"><Table><TableBody>{achados.map((d) => <TableRow key={d.id}><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.documento || "—"}</p></TableCell><TableCell className={`num ${d.vencimento < dia ? "text-debit" : ""}`}>{fmtData(d.vencimento)}{d.vencimento < dia ? " · vencido" : ""}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell><TableCell className="w-24 text-right"><Button size="sm" variant="outline" onClick={() => incluir(d)}><Plus /> Incluir</Button></TableCell></TableRow>)}</TableBody></Table></div></div>}
             {todas.length === 0 ? <p className="border-y py-5 text-sm text-muted-foreground">Nenhuma despesa com vencimento {incluirVencidas ? "até esta" : "nesta"} data.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-10"><Checkbox aria-label="Marcar todos" checked={despesas.length === todas.length ? true : despesas.length ? "indeterminate" : false} onCheckedChange={(v) => (v ? marcarTodos() : desmarcarTodos())} /></TableHead><TableHead>Fornecedor / despesa</TableHead><TableHead>Vencimento</TableHead><TableHead>Nº documento</TableHead><TableHead>Banco indicado</TableHead><TableHead className="text-right">Valor do título</TableHead><TableHead className="w-10" /></TableRow></TableHeader><TableBody>{todas.map((d) => { const extra = sel.incluidos.includes(d.id) || d.id.startsWith("manual-"); return <TableRow key={d.id} className={marcado(d.id) ? "" : "opacity-50"}><TableCell><Checkbox aria-label={`Selecionar ${d.contraparte}`} checked={marcado(d.id)} onCheckedChange={(v) => alternar(d.id, v === true)} /></TableCell><TableCell><p className="font-medium">{d.contraparte || "Não informado"}</p><p className="text-xs text-muted-foreground">{d.descricao || d.categoria || "—"}</p>{d.id.startsWith("manual-") ? <p className="mt-1 text-xs text-muted-foreground">Incluída manualmente</p> : sel.incluidos.includes(d.id) ? <p className="mt-1 text-xs text-muted-foreground">Trazida de {fmtData(d.vencimento)}</p> : null}{d.vencimento < dia && <p className="mt-1 inline-flex items-center gap-1 border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs font-medium text-debit">Não pago no vencimento</p>}</TableCell><TableCell className="num">{fmtData(d.vencimento)}</TableCell><TableCell>{d.documento || "—"}</TableCell><TableCell>{d.banco || "Não definido"}</TableCell><TableCell className="num text-right">{fmt(d.valor)}</TableCell><TableCell>{extra && <Button variant="ghost" size="icon" aria-label="Retirar do dia" onClick={() => retirar(d.id)}><Trash2 /></Button>}</TableCell></TableRow>; })}<TableRow className="bg-muted/40 font-semibold"><TableCell /><TableCell colSpan={4}>Total selecionado para pagamento · {despesas.length} de {todas.length}</TableCell><TableCell className="num text-right">{fmt(pagamentos)}</TableCell><TableCell /></TableRow></TableBody></Table></div>}
             <Dialog open={manualAberto} onOpenChange={setManualAberto}><DialogContent><DialogHeader><DialogTitle>Incluir despesa manual</DialogTitle><DialogDescription>Para títulos que não estão na base. Entra marcada para pagamento em {fmtData(dia)}.</DialogDescription></DialogHeader>
               <div className="grid gap-3 sm:grid-cols-2">
