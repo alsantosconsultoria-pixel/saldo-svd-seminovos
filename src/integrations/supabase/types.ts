@@ -77,6 +77,30 @@ export type Database = {
         }
         Relationships: []
       }
+      permissoes_usuario: {
+        Row: {
+          abas: string[]
+          atualizado_em: string
+          backup: boolean
+          importacoes: string[]
+          user_id: string
+        }
+        Insert: {
+          abas?: string[]
+          atualizado_em?: string
+          backup?: boolean
+          importacoes?: string[]
+          user_id: string
+        }
+        Update: {
+          abas?: string[]
+          atualizado_em?: string
+          backup?: boolean
+          importacoes?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       plano_categorias: {
         Row: {
           categoria: string
