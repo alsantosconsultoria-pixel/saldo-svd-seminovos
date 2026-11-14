@@ -12,6 +12,8 @@ const demo = seed as unknown as Extrato[];
 export function useExtratos() {
   const [lista, setLista] = useState<Extrato[]>([]);
   const [pronto, setPronto] = useState(false);
+  const [versao, setVersao] = useState(0);
+  const recarregar = useCallback(() => setVersao((v) => v + 1), []);
   const remoto = useRef(false); // já carregou da nuvem
   const aplicandoRemoto = useRef(false); // evita eco: mudança vinda da nuvem não regrava
 
@@ -79,7 +81,7 @@ export function useExtratos() {
       if (canal) supabase.removeChannel(canal);
       if (onFoco) document.removeEventListener("visibilitychange", onFoco);
     };
-  }, [pronto]);
+  }, [pronto, versao]);
 
   // grava cópia local sempre que a lista muda
   useEffect(() => {
@@ -132,7 +134,7 @@ export function useExtratos() {
     demo.forEach((e) => void subir(e));
   }, [subir]);
 
-  return { lista, add, remove, reset, pronto };
+  return { lista, add, remove, reset, pronto, recarregar };
 }
 
 const chave = (e: Extrato) => `${e.banco}|${e.agencia.replace(/\D/g, "")}|${e.conta.replace(/\D/g, "")}`;

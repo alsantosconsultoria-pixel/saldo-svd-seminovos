@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Upload, Download, Trash2, RotateCcw, Printer, LogOut, FileText, FileSpreadsheet, ChevronRight, ArrowLeft } from "lucide-react";
+import { Upload, Download, Trash2, RotateCcw, Printer, LogOut, FileText, FileSpreadsheet, ChevronRight, ArrowLeft, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +26,8 @@ import type { DiaFluxo } from "@/lib/fluxo";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { souAdmin } from "@/lib/admin.functions";
+import { useMinhasPermissoes } from "@/lib/permissoes";
+import { AdminPermissoes } from "@/components/AdminPermissoes";
 import { AdminUsuarios } from "@/components/AdminUsuarios";
 import { AdminPlano } from "@/components/AdminPlano";
 import { MinhaSenha } from "@/components/MinhaSenha";
@@ -52,7 +54,7 @@ const contaLabel = (e: Extrato) => `${e.banco} · Ag ${e.agencia} · CC ${e.cont
 type VistaPainel = { tipo: "composicao"; titulo: string; itens: Realizado[] };
 
 function Index() {
-  const { lista, add, remove, reset } = useExtratos();
+  const { lista, add, remove, reset, recarregar } = useExtratos();
   const navigate = useNavigate();
   const [filtro, setFiltro] = useState("todos");
   const [carregando, setCarregando] = useState(false);
@@ -93,6 +95,20 @@ function Index() {
   const [vista, setVista] = useState<VistaPainel | null>(null);
   const [admin, setAdmin] = useState(false);
   useEffect(() => { souAdmin().then((r) => setAdmin(r.admin)).catch(() => setAdmin(false)); }, []);
+  const [versaoDados, setVersaoDados] = useState(0);
+  const perm = useMinhasPermissoes(admin, versaoDados);
+  const podeAba = (id: string) => perm.abas.includes(id);
+  const podeImp = (id: string) => perm.importacoes.includes(id);
+  useEffect(() => {
+    if (aba === "admin" ? !admin : !perm.abas.includes(aba)) { const prim = perm.abas[0]; if (prim) setAba(prim); else if (admin) setAba("admin"); }
+  }, [perm, admin, aba]);
+  function atualizarTudo() {
+    recarregar();
+    recarregarRealizados();
+    setAtualizacaoPrevisoes((v) => v + 1);
+    setVersaoDados((v) => v + 1);
+    toast.success("Dados atualizados.");
+  }
   async function sair() {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
@@ -228,8 +244,9 @@ function Index() {
     setArrastando(false);
     try {
       const arquivos = Array.from(files);
-      const pdfs = arquivos.filter((f) => /\.pdf$/i.test(f.name));
-      const planilhas = arquivos.filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
+      const pdfs = podeImp("extrato") ? arquivos.filter((f) => /\.pdf$/i.test(f.name)) : [];
+      const planilhas = podeImp("previsoes") ? arquivos.filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name)) : [];
+      if (pdfs.length + planilhas.length === 0) { toast.error("Você não tem permissão para importar esse tipo de arquivo."); return; }
       if (pdfs.length + planilhas.length !== arquivos.length) toast.error("Use extratos PDF ou planilhas Excel/CSV.");
       if (pdfs.length) await importar(pdfs);
       for (const arquivo of planilhas) {
@@ -305,13 +322,14 @@ function Index() {
           </div>
           <div className="grid w-full grid-cols-2 gap-2 print:hidden sm:flex sm:w-auto sm:flex-wrap">
              <input ref={input} type="file" accept="application/pdf" multiple hidden onChange={(e) => importarArquivos(e.target.files)} />
-            <Button variant="secondary" onClick={() => input.current?.click()} disabled={carregando}>
+            {podeImp("extrato") && <Button variant="secondary" onClick={() => input.current?.click()} disabled={carregando}>
               <Upload /> {carregando ? "Importando..." : "Importar extrato PDF"}
-            </Button>
+            </Button>}
             <input ref={inputPlanilha} type="file" accept=".xlsx,.xls,.csv" multiple hidden onChange={(e) => importarArquivos(e.target.files)} />
-            <Button variant="secondary" onClick={() => inputPlanilha.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar previsões</Button>
+            {podeImp("previsoes") && <Button variant="secondary" onClick={() => inputPlanilha.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar previsões</Button>}
             <input ref={inputRealizado} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => importarRealizadoArquivo(e.target.files)} />
-            <Button variant="secondary" onClick={() => inputRealizado.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar realizado</Button>
+            {podeImp("realizado") && <Button variant="secondary" onClick={() => inputRealizado.current?.click()} disabled={carregando}><FileSpreadsheet /> Importar realizado</Button>}
+            <Button variant="secondary" onClick={atualizarTudo} title="Busca de novo todos os dados salvos"><RefreshCw /> Atualizar</Button>
             <Button variant="secondary" onClick={() => window.print()}><Printer /> Imprimir</Button>
             <MinhaSenha />
             <Button variant="secondary" onClick={sair}><LogOut /> Sair</Button>
@@ -328,12 +346,12 @@ function Index() {
               {lista.map((e) => <SelectItem key={e.id} value={e.id}>{contaLabel(e)}</SelectItem>)}
             </SelectContent>
           </Select>
-          <div className="flex gap-2 print:hidden">
+          {perm.backup && <div className="flex gap-2 print:hidden">
             <input ref={inputJSON} type="file" accept=".json,application/json" hidden onChange={(e) => restaurarJSON(e.target.files)} />
             <Button variant="outline" size="sm" onClick={() => inputJSON.current?.click()}><Upload /> Restaurar JSON</Button>
             <Button variant="outline" size="sm" onClick={baixarCSV}><Download /> CSV</Button>
             <Button variant="outline" size="sm" onClick={baixarJSON}><Download /> JSON</Button>
-          </div>
+          </div>}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 print:hidden">
@@ -351,18 +369,18 @@ function Index() {
         <Tabs value={aba} onValueChange={(valor) => { setAba(valor); setRelatorioPainel(false); }}>
           <div className="-mx-4 overflow-x-auto px-4 pb-1 print:hidden sm:mx-0 sm:px-0">
             <TabsList className="w-max">
-              <TabsTrigger value="painel">Painel</TabsTrigger>
-              <TabsTrigger value="diario">Saldo diário</TabsTrigger>
-              <TabsTrigger value="lanc">Lançamentos</TabsTrigger>
-              <TabsTrigger value="contas">Contas</TabsTrigger>
-              <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>
-              <TabsTrigger value="previsoes">Fluxo</TabsTrigger>
+              {podeAba("painel") && <TabsTrigger value="painel">Painel</TabsTrigger>}
+              {podeAba("diario") && <TabsTrigger value="diario">Saldo diário</TabsTrigger>}
+              {podeAba("lanc") && <TabsTrigger value="lanc">Lançamentos</TabsTrigger>}
+              {podeAba("contas") && <TabsTrigger value="contas">Contas</TabsTrigger>}
+              {podeAba("tratativas") && <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>}
+              {podeAba("previsoes") && <TabsTrigger value="previsoes">Fluxo</TabsTrigger>}
               {admin && <TabsTrigger value="admin">Administração</TabsTrigger>}
             </TabsList>
           </div>
 
-          <TabsContent value="tratativas"><Tratativas lista={lista} /></TabsContent>
-          {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminPlano /><AdminDados /></TabsContent>}
+          <TabsContent value="tratativas"><Tratativas key={versaoDados} lista={lista} /></TabsContent>
+          {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminPermissoes /><AdminPlano /><AdminDados /></TabsContent>}
           <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} realizados={realizados} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
