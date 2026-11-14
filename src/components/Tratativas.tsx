@@ -132,10 +132,11 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
   const executarBusca = useCallback(async (termo: string) => {
     const meu = ++buscaSeq.current;
     const tokens = tokensDeBusca(termo);
-    if (!tokens.length) { setAchados([]); setBuscando(false); setBuscaFeita(false); return; }
+    const primeira = tokens[0];
+    if (!primeira) { setAchados([]); setBuscando(false); setBuscaFeita(false); return; }
     setBuscando(true);
     const { data, error } = await supabase.from("previsoes").select("*").eq("tipo", "pagar")
-      .or(clausulaDeBusca(tokens[0])).order("vencimento").limit(300);
+      .or(clausulaDeBusca(primeira)).order("vencimento").limit(300);
     if (meu !== buscaSeq.current) return;
     setBuscando(false); setBuscaFeita(true);
     if (error) { setAchados([]); toast.error("Não foi possível buscar."); return; }
