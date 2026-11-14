@@ -120,6 +120,13 @@
       "when": 1794577510604,
       "tag": "0016_tratativa_selecao",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794658229711,
+      "tag": "0017_permissoes_usuario",
+      "breakpoints": true
     }
   ]
 }
