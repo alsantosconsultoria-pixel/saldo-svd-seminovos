@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { type Extrato } from "@/lib/extrato/parser";
 import { fmt, fmtData, hoje } from "@/lib/extrato/store";
+import { SeloExtrato, SinaleiroSaldos } from "@/components/StatusExtrato";
 import { balancoNaData, clausulaDeBusca, contemTodosOsTokens, despesasAteData, montarPagamentos, somarValores, textoDeBusca, tokensDeBusca, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { RelatorioTratativas, type DespesaRelatorio } from "@/components/RelatorioTratativas";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
@@ -265,11 +266,12 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
             <Resumo titulo="Após pagamentos previstos" valor={total - pagamentos} detalhe="Projeção, sem baixa nos bancos" />
           </div>
           {(incompleto || total < pagamentos) && <div role="status" className="flex items-start gap-3 border-l-4 border-destructive bg-destructive/5 p-4 text-sm"><AlertTriangle className="size-5 shrink-0 text-debit" /><div><p className="font-semibold">{incompleto ? "Há contas sem saldo conhecido para esta data." : `Faltam ${fmt(pagamentos - total)} para os pagamentos do dia.`}</p><p className="mt-1 text-muted-foreground">{incompleto ? "O total é parcial; confira as bases antes de apresentar para aprovação." : "Transferências entre contas não aumentam o saldo consolidado."}</p></div></div>}
+          <SinaleiroSaldos lista={lista} referencia={dia} />
           <section>
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-lg font-semibold">Posição e ajustes das contas</h3><span className="text-xs text-muted-foreground">Referência: {fmtData(dia)}</span></div>
             <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Banco / conta</TableHead><TableHead className="text-right">Saldo do extrato</TableHead><TableHead className="text-right">Recebido</TableHead><TableHead className="text-right">Enviado</TableHead><TableHead className="text-right">Após ajustes</TableHead><TableHead>Valor a transferir</TableHead></TableRow></TableHeader><TableBody>
               {linhas.map(({ e, base, referencia, ent, sai, final }) => <TableRow key={e.id}>
-                <TableCell><p className="font-semibold">{e.banco}</p><p className="text-xs text-muted-foreground">Ag {e.agencia || "—"} · CC {e.conta || "—"}</p><p className="mt-1 text-xs text-muted-foreground">{referencia ? `Base: ${fmtData(referencia)}` : "Sem base para a data"}</p></TableCell>
+                <TableCell><p className="flex flex-wrap items-center gap-2 font-semibold">{e.banco} <SeloExtrato e={e} referencia={dia} /></p><p className="text-xs text-muted-foreground">Ag {e.agencia || "—"} · CC {e.conta || "—"}</p><p className="mt-1 text-xs text-muted-foreground">{referencia ? `Base: ${fmtData(referencia)}` : "Sem base para a data"}</p></TableCell>
                 <TableCell className={`num text-right ${base !== null && base < 0 ? "text-debit" : ""}`}>{base === null ? "Indisponível" : fmt(base)}</TableCell>
                 <TableCell className="num text-right text-credit">{ent ? fmt(ent) : "—"}</TableCell><TableCell className="num text-right text-debit">{sai ? fmt(sai) : "—"}</TableCell>
                 <TableCell className={`num text-right font-semibold ${final !== null && final < 0 ? "text-debit" : "text-credit"}`}>{final === null ? "Indisponível" : fmt(final)}</TableCell>

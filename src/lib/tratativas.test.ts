@@ -101,3 +101,11 @@ describe("Busca de títulos ao digitar", () => {
     expect(clausulaDeBusca("%%")).toBe("");
   });
 });
+
+import { statusExtrato, diaUtilAnterior } from "./tratativas";
+describe("sinaleiro do extrato", () => {
+  const conta = (datas: string[]) => ({ id: "x", banco: "B", agencia: "", conta: "", titular: "", arquivo: "", importadoEm: "", saldoInicial: 0, dataSaldoInicial: "", saldoFinalInformado: null, saldosInformados: datas.map((data) => ({ data, saldo: 1 })), transacoes: [] }) as never;
+  it("segunda-feira aceita extrato de sexta", () => { expect(diaUtilAnterior("2026-11-16")).toBe("2026-11-13"); expect(statusExtrato(conta(["2026-11-13"]), "2026-11-16").status).toBe("ok"); });
+  it("extrato antigo fica desatualizado", () => expect(statusExtrato(conta(["2026-11-12"]), "2026-11-16").status).toBe("desatualizado"));
+  it("sem extrato é manual", () => expect(statusExtrato(conta([]), "2026-11-16").status).toBe("manual"));
+});

@@ -92,3 +92,17 @@ export function clausulaDeBusca(token: string) {
   const limpo = token.replace(/[^\p{L}\p{N}]/gu, "");
   return limpo ? CAMPOS_DE_BUSCA.map((c) => `${c}.ilike.%${limpo}%`).join(",") : "";
 }
+
+// Sinaleiro do extrato: "ok" quando o último extrato cobre ao menos o dia útil anterior à referência;
+// "desatualizado" quando é mais antigo; "manual" quando a conta não tem nenhuma data de extrato.
+export type StatusExtrato = "ok" | "desatualizado" | "manual";
+export function diaUtilAnterior(data: string) {
+  const d = new Date(`${data}T12:00:00Z`);
+  do d.setUTCDate(d.getUTCDate() - 1); while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+  return d.toISOString().slice(0, 10);
+}
+export function statusExtrato(e: Extrato, referencia: string): { status: StatusExtrato; ultima: string } {
+  const ultima = ultimoSaldoExtrato(e).data;
+  if (!ultima || (e.transacoes.length === 0 && e.saldosInformados.length === 0)) return { status: "manual", ultima: "" };
+  return { status: ultima >= diaUtilAnterior(referencia) ? "ok" : "desatualizado", ultima };
+}

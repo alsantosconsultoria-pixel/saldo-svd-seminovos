@@ -24,6 +24,7 @@ import { ResumoPlano } from "@/components/ResumoPlano";
 import { fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
 import type { DiaFluxo } from "@/lib/fluxo";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
+import { SeloExtrato, SinaleiroSaldos } from "@/components/StatusExtrato";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { souAdmin } from "@/lib/admin.functions";
 import { useMinhasPermissoes } from "@/lib/permissoes";
@@ -503,10 +504,11 @@ function Index() {
           </TabsContent>
 
           <TabsContent value="contas" className="space-y-3">
+            <SinaleiroSaldos lista={lista} referencia={hojeIso} />
             {lista.map((e) => (
               <Card key={e.id} className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
                 <div className="min-w-0">
-                  <div className="font-semibold">{contaLabel(e)}</div>
+                  <div className="flex flex-wrap items-center gap-2 font-semibold">{contaLabel(e)} <SeloExtrato e={e} referencia={hojeIso} /></div>
                   <div className="text-sm text-muted-foreground">{e.titular} · {e.arquivo} · {e.transacoes.length} lançamentos</div>
                 </div>
                 <div className="flex items-center gap-4">
