@@ -1,3 +1,4 @@
+import { proximoDiaUtil } from "@/lib/calendario";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -170,7 +171,7 @@ function Index() {
       const [c, m, p] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("tipo,vencimento,categoria,valor")]);
       setPlanoContas((c.data ?? []) as ContaPlano[]);
       setPlanoMapa(Object.fromEntries((m.data ?? []).map((x) => [x.categoria, x.conta_id])));
-      setPrevs((p.data ?? []).map((x) => ({ ...x, valor: Number(x.valor) })));
+      setPrevs((p.data ?? []).map((x) => ({ ...x, valor: Number(x.valor), vencimento: proximoDiaUtil(x.vencimento) })));
     };
     ler();
     const ch = supabase.channel("painel-plano").on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_categorias" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_contas" }, ler).subscribe();

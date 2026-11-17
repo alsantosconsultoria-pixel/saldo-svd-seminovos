@@ -1,3 +1,4 @@
+import { ajustarVencimento } from "@/lib/calendario";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, FileText, Printer, Sparkles, Tag, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,7 +44,7 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
       supabase.from("plano_contas").select("*"),
       supabase.from("plano_categorias").select("*"),
     ]);
-    setItens((data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })));
+    setItens((data ?? []).map((r) => ajustarVencimento({ ...r, valor: Number(r.valor) })));
     setContas((c.data ?? []) as ContaPlano[]);
     setMapa(Object.fromEntries((m.data ?? []).map((x) => [x.categoria, x.conta_id])));
   }
