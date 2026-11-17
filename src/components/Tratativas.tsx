@@ -1,3 +1,4 @@
+import { ajustarVencimento, somarDias } from "@/lib/calendario";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, CalendarDays, ChevronLeft, ChevronRight, FileText, Link2, Loader2, Plus, Printer, Search, Stamp, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -72,7 +73,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
       supabase.from("transferencias").select("*").eq("data", dia).order("criado_em"),
       (incluirVencidas
         ? supabase.from("previsoes").select("*").eq("tipo", "pagar").lte("vencimento", dia)
-        : supabase.from("previsoes").select("*").eq("tipo", "pagar").eq("vencimento", dia)
+        : supabase.from("previsoes").select("*").eq("tipo", "pagar").gte("vencimento", somarDias(dia, -10)).lte("vencimento", dia)
       ).order("vencimento").order("contraparte"),
     ]);
     const s = await supabase.from("tratativa_selecao").select("*").eq("dia", dia).maybeSingle();
@@ -89,9 +90,9 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
       if (!ativo) return;
       if (t.error || p.error) { setErro(true); setCarregando(false); return; }
       setTransf((t.data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })));
-      setItens((p.data ?? []).map((r) => ({ ...r, valor: Number(r.valor) })));
+      setItens((p.data ?? []).map((r) => ajustarVencimento({ ...r, valor: Number(r.valor) })));
       setSel({ desmarcados: s.data?.desmarcados ?? [], incluidos: s.data?.incluidos ?? [], manuais: (s.data?.manuais as unknown as DespesaRelatorio[]) ?? [] });
-      setIncluidosRows((inc.data ?? []).map((r: DespesaRelatorio) => ({ ...r, valor: Number(r.valor) })));
+      setIncluidosRows((inc.data ?? []).map((r: DespesaRelatorio) => ajustarVencimento({ ...r, valor: Number(r.valor) })));
       setErro(false); setCarregando(false);
       } catch {
         if (ativo) { setErro(true); setCarregando(false); }
@@ -142,7 +143,7 @@ export function Tratativas({ lista }: { lista: Extrato[] }) {
     setBuscando(false); setBuscaFeita(true);
     if (error) { setAchados([]); toast.error("Não foi possível buscar."); return; }
     const ja = idsNoDia.current;
-    const encontrados = (data ?? []).map((r) => ({ ...r, valor: Number(r.valor) }))
+    const encontrados = (data ?? []).map((r) => ajustarVencimento({ ...r, valor: Number(r.valor) }))
       .filter((r) => !ja.has(r.id) && contemTodosOsTokens(tokens, textoDeBusca(r)))
       .slice(0, 30);
     setAchados(encontrados);
