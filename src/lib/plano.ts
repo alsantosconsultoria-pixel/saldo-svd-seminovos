@@ -72,3 +72,25 @@ export function itensForecast(realizados: { tipo: string; data: string; categori
     ...previsoes.filter((p) => p.vencimento > corte),
   ];
 }
+
+// Programação das Tratativas como estimativa de dias ainda não realizados:
+// no dia programado, os títulos marcados (do dia, trazidos de outras datas e manuais) substituem as despesas previstas.
+export interface Programacao { dia: string; desmarcados: string[]; incluidos: string[]; manuais: { id: string; valor: number; categoria?: string }[] }
+export function aplicarProgramacao<T extends ItemPlano & { id: string }>(prevs: T[], programas: Programacao[], corte: string): ItemPlano[] {
+  const ativos = programas.filter((p) => p.dia > corte);
+  if (!ativos.length) return prevs;
+  const porId = new Map(prevs.map((p) => [p.id, p]));
+  const remover = new Set<string>();
+  const extras: ItemPlano[] = [];
+  for (const g of ativos) {
+    const fora = new Set(g.desmarcados);
+    const base = prevs.filter((p) => p.tipo === "pagar" && p.vencimento === g.dia);
+    const incl = g.incluidos.map((id) => porId.get(id)).filter((p): p is T => !!p);
+    for (const p of [...base, ...incl]) {
+      remover.add(p.id);
+      if (!fora.has(p.id)) extras.push({ tipo: "pagar", vencimento: g.dia, categoria: p.categoria, valor: p.valor });
+    }
+    for (const m of g.manuais) if (!fora.has(m.id)) extras.push({ tipo: "pagar", vencimento: g.dia, categoria: m.categoria || "Sem categoria", valor: Number(m.valor) });
+  }
+  return [...prevs.filter((p) => !remover.has(p.id)), ...extras];
+}

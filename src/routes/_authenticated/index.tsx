@@ -22,7 +22,7 @@ import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
 import { ResumoPlano } from "@/components/ResumoPlano";
-import { fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
+import { aplicarProgramacao, type Programacao, fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
 import type { DiaFluxo } from "@/lib/fluxo";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { SeloExtrato, SinaleiroSaldos } from "@/components/StatusExtrato";
@@ -165,16 +165,18 @@ function Index() {
   // plano financeiro + previsões para o painel e o forecast
   const [planoContas, setPlanoContas] = useState<ContaPlano[]>([]);
   const [planoMapa, setPlanoMapa] = useState<Record<string, string>>({});
-  const [prevs, setPrevs] = useState<{ tipo: string; vencimento: string; categoria: string; valor: number }[]>([]);
+  const [programas, setProgramas] = useState<Programacao[]>([]);
+  const [prevs, setPrevs] = useState<{ id: string; tipo: string; vencimento: string; categoria: string; valor: number }[]>([]);
   useEffect(() => {
     const ler = async () => {
-      const [c, m, p] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("tipo,vencimento,categoria,valor")]);
+      const [c, m, p, sel] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("id,tipo,vencimento,categoria,valor"), supabase.from("tratativa_selecao").select("dia,desmarcados,incluidos,manuais")]);
+      setProgramas((sel.data ?? []).map((g) => ({ dia: g.dia, desmarcados: g.desmarcados ?? [], incluidos: g.incluidos ?? [], manuais: (g.manuais as unknown as Programacao["manuais"]) ?? [] })));
       setPlanoContas((c.data ?? []) as ContaPlano[]);
       setPlanoMapa(Object.fromEntries((m.data ?? []).map((x) => [x.categoria, x.conta_id])));
       setPrevs((p.data ?? []).map((x) => ({ ...x, valor: Number(x.valor), vencimento: proximoDiaUtil(x.vencimento) })));
     };
     ler();
-    const ch = supabase.channel("painel-plano").on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_categorias" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_contas" }, ler).subscribe();
+    const ch = supabase.channel("painel-plano").on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_categorias" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "tratativa_selecao" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_contas" }, ler).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [atualizacaoPrevisoes]);
   const itensReal = realPainel.map((r) => ({ tipo: r.tipo, vencimento: r.data, categoria: r.categoria, valor: r.valor }));
@@ -188,10 +190,12 @@ function Index() {
   const somaDias = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
   const fcDe = painelDe || somaDias(hojeIso, -14);
   const fcAte = painelAte && painelAte >= fcDe ? painelAte : somaDias(fcDe > hojeIso ? fcDe : hojeIso, 14);
+  // Sem realizado hoje, o dia de hoje vira estimativa pela programação das Tratativas.
+  const corte = realizados.some((r) => r.data === hojeIso) ? hojeIso : diaAntes(hojeIso);
   const forecast = useMemo(() => {
     const dias: string[] = [];
     for (let d = fcDe, i = 0; d <= fcAte && i < 370; d = somaDias(d, 1), i++) dias.push(d);
-    const itens = itensForecast(realizados.filter((r) => r.data >= fcDe && r.data <= fcAte), prevs.filter((p) => p.vencimento >= fcDe && p.vencimento <= fcAte), hojeIso);
+    const itens = itensForecast(realizados.filter((r) => r.data >= fcDe && r.data <= fcAte), aplicarProgramacao(prevs, programas, corte).filter((p) => p.vencimento >= fcDe && p.vencimento <= fcAte), corte);
     const linhas = fluxoPorPlano(itens, dias, planoContas, planoMapa, fcDe);
     const ultExt = ativos.map((e) => ultimoSaldoExtrato(e).data).filter(Boolean).sort().at(-1) ?? "";
     const saldoBanco = (d: string) => ativos.reduce((a, e) => a + (saldoNaData(e, d)?.saldo ?? e.saldoInicial), 0);
@@ -200,12 +204,12 @@ function Index() {
     const periodo: DiaFluxo[] = dias.map((data, i) => {
       const r = linhas[0]?.valores[i] ?? 0, p = linhas[1]?.valores[i] ?? 0;
       const inicial = saldo;
-      saldo = data <= ultExt && data <= hojeIso ? saldoBanco(data) : Math.round((inicial + r - p) * 100) / 100;
+      saldo = data <= ultExt && data <= corte ? saldoBanco(data) : Math.round((inicial + r - p) * 100) / 100;
       return { data, inicial, receber: r, pagar: p, final: saldo, faltante: saldo < 0 ? Math.min(-saldo, p) : 0 };
     });
-    const soma = (t: string, proj: boolean) => itens.filter((x) => x.tipo === t && (x.vencimento > hojeIso) === proj).reduce((a, x) => a + x.valor, 0);
+    const soma = (t: string, proj: boolean) => itens.filter((x) => x.tipo === t && (x.vencimento > corte) === proj).reduce((a, x) => a + x.valor, 0);
     return { linhas, periodo, saldoIni: ini0, realE: soma("receber", false), realS: soma("pagar", false), projE: soma("receber", true), projS: soma("pagar", true) };
-  }, [fcDe, fcAte, realizados, prevs, planoContas, planoMapa, ativos, hojeIso]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fcDe, fcAte, realizados, prevs, planoContas, planoMapa, ativos, corte, programas]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function importar(files: File[]) {
     if (!files?.length) return;
@@ -393,7 +397,7 @@ function Index() {
                 {relatorioPainel && <><Button onClick={() => window.print()}><Printer /> Imprimir / PDF</Button><CompartilharRelatorio titulo="Demonstrativo gerencial de saldos · Grupo SVD" resumo={`Contas selecionadas: ${ativos.length}. Saldo inicial: ${fmt(saldoIni)}. Saldo final (último dia do extrato): ${fmt(saldoFim)}.`} arquivo={`painel-${hojeIso}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} /></>}
               </div>
             </div>
-            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} periodo={forecast.periodo} corte={hojeIso} linhas={forecast.linhas} saldoIni={forecast.saldoIni} realE={forecast.realE} realS={forecast.realS} projE={forecast.projE} projS={forecast.projS} maiores={maioresPlano} onCategoria={abrirCategoria} /></div>}
+            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} periodo={forecast.periodo} corte={corte} linhas={forecast.linhas} saldoIni={forecast.saldoIni} realE={forecast.realE} realS={forecast.realS} projE={forecast.projE} projS={forecast.projS} maiores={maioresPlano} onCategoria={abrirCategoria} /></div>}
             <div className={`dashboard-editor space-y-4 ${relatorioPainel ? "hidden" : ""}`}>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
