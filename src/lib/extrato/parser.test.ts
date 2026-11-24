@@ -47,3 +47,30 @@ describe("Santander ordem decrescente", () => {
     expect(saldoDiario(e)[0]).toMatchObject({ fechamento: 238.07, ok: true });
   });
 });
+describe("Sicoob ordem decrescente", () => {
+  it("lê valores com C/D colado, inverte ordem decrescente e usa Saldo em conta", () => {
+    const e = parseLinhas([
+      [{ x: 24, text: "23/11/2026, 08:03" }, { x: 300, text: "Sicoob | Internet Banking" }],
+      [{ x: 34, text: "Cooperativa:" }, { x: 364, text: "3031-7 / SICOOB CREDICANOINHAS/SC" }],
+      [{ x: 34, text: "Conta:" }, { x: 254, text: "200.938-2 / SVD SEMINOVOS COMERCIO DE VEICULOS LTDA" }],
+      [{ x: 34, text: "Periodo:" }, { x: 449, text: "19/11/2026 - 23/11/2026" }],
+      [{ x: 37, text: "23/11" }, { x: 69, text: "3178000" }, { x: 146, text: "TARIFA COBRANÇA" }, { x: 514, text: "R$" }, { x: 531, text: "3,40D" }],
+      [{ x: 37, text: "23/11" }, { x: 69, text: "3176742" }, { x: 146, text: "CRÉD.LIQUIDAÇÃO COBRANÇA" }, { x: 482, text: "R$" }, { x: 499, text: "100.000,00C" }],
+      [{ x: 37, text: "23/11" }, { x: 146, text: "SALDO DO DIA" }, { x: 488, text: "R$" }, { x: 504, text: "99.996,60C" }],
+      [{ x: 37, text: "21/08" }, { x: 132, text: "SALDO BLOQUEADO ANTERIOR" }, { x: 518, text: "R$" }, { x: 534, text: "0,00*" }],
+      [{ x: 37, text: "21/08" }, { x: 146, text: "SALDO ANTERIOR" }, { x: 514, text: "R$" }, { x: 531, text: "0,00C" }],
+      [{ x: 36, text: "Saldo em conta:" }, { x: 514, text: "99.996,60C" }],
+      [{ x: 36, text: "Saldo disponível:" }, { x: 514, text: "99.906,60C" }],
+    ], "19.11.pdf");
+    expect(e.banco).toBe("Sicoob");
+    expect(e.agencia).toBe("3031");
+    expect(e.conta).toBe("200.938-2");
+    expect(e.saldoInicial).toBe(0);
+    expect(e.saldoFinalInformado).toBe(99996.6);
+    expect(e.transacoes.map((t) => [t.descricao, t.tipo, t.valor])).toEqual([
+      ["CRÉD.LIQUIDAÇÃO COBRANÇA", "C", 100000],
+      ["TARIFA COBRANÇA", "D", 3.4],
+    ]);
+    expect(saldoDiario(e)[0]).toMatchObject({ data: "2026-11-23", fechamento: 99996.6, ok: true });
+  });
+});

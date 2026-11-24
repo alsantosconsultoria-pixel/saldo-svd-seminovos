@@ -96,7 +96,7 @@ function tokens(l: Linha): Fragmento[] {
       if (t.text === "D" && !prev.text.startsWith("-")) prev.text = "-" + prev.text;
     } else {
       // "551,61 C" no mesmo fragmento
-      const cd = t.text.match(/^(-?[\d.,]+)\s+([CD])$/);
+      const cd = t.text.match(/^(-?[\d.,]+)\s*([CD])$/);
       if (cd && RE_VALOR.test(cd[1]!)) res.push({ x: t.x, text: cd[2] === "D" && !cd[1]!.startsWith("-") ? "-" + cd[1] : cd[1]! });
       else res.push({ ...t });
     }
@@ -133,13 +133,15 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
   let modoFuturo = false;
   let dataPendente: string | null = null; // data em linha própria (layout Caixa)
   let contaMax: number | null = null; // Santander: "Saldo de ContaMax" é o saldo final
+  let idxSaldoInicial = -1;
+  let primeiroTxIdx = -1;
   const linhaSaldo: { t: Transacao; saldo: number }[] = [];
 
   const isDataLinha = (l: Linha) => RE_DATA.test(tokens(l)[0]?.text ?? "");
 
   linhas.forEach((linha, i) => {
     const txt = textoLinhas[i]!.toUpperCase();
-    if (/SALDO DE CONTAMAX/.test(txt)) {
+    if (/SALDO DE CONTAMAX|SALDO EM CONTA\b/.test(txt)) {
       const v = tokens(linha).filter((t) => RE_VALOR.test(t.text));
       if (v.length) contaMax = brl(v.at(-1)!.text);
       return;
@@ -188,6 +190,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
       if (saldoInicial === null) {
         saldoInicial = ultimo;
         dataSaldoInicial = data;
+        idxSaldoInicial = i;
       }
       return;
     }
@@ -223,6 +226,7 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
       futuros.push(t);
       return;
     }
+    if (primeiroTxIdx < 0) primeiroTxIdx = i;
     tx.push(t);
     if (valores.length > 1) {
       linhaSaldo.push({ t, saldo: ultimo });
@@ -252,13 +256,18 @@ export function parseLinhas(linhas: Linha[], arquivo: string, ocr = false): Extr
   const desc = linhaSaldo.length > 1 && linhaSaldo.every((x, k) => k === 0 || (x.t.data <= linhaSaldo[k - 1]!.t.data &&
     c(linhaSaldo[k - 1]!.saldo) === c(x.saldo + sv(linhaSaldo[k - 1]!.t))));
   const asc = linhaSaldo.every((x, k) => k === 0 || c(x.saldo) === c(linhaSaldo[k - 1]!.saldo + sv(x.t)));
-  if (desc && !asc) {
+  const descPorData =
+    !linhaSaldo.length &&
+    ((tx.length > 1 && tx.every((x, k) => k === 0 || x.data <= tx[k - 1]!.data) && tx[0]!.data > tx.at(-1)!.data) ||
+      (idxSaldoInicial >= 0 && primeiroTxIdx >= 0 && idxSaldoInicial > primeiroTxIdx));
+  if ((desc && !asc) || descPorData) {
     tx.reverse();
     saldos.reverse();
     if (saldos.length) saldoFinal = saldos.at(-1)!.saldo;
   }
   if (contaMax !== null) {
-    const ultimaData = saldos.at(-1)?.data ?? tx.map((t) => t.data).sort().at(-1);
+    const periodo = textoTotal.match(/(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})/)?.[2];
+    const ultimaData = saldos.at(-1)?.data ?? tx.map((t) => t.data).sort().at(-1) ?? (periodo ? iso(periodo) : undefined);
     if (ultimaData) saldos.push({ data: ultimaData, saldo: contaMax });
     saldoFinal = contaMax;
   }
