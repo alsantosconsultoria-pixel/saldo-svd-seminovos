@@ -31,12 +31,13 @@ function curvaPng(periodo: DiaFluxo[], corte?: string): string {
   return c.toDataURL("image/png").split(",")[1]!;
 }
 
-export interface OpcoesExcel { titulo: string; subtitulo?: string; corte?: string; kpis?: { t: string; v: number }[]; semSaldo?: boolean; arquivo: string }
+export interface OpcoesExcel { titulo: string; subtitulo?: string; corte?: string; kpis?: { t: string; v: number }[]; semSaldo?: boolean; incluirCurva?: boolean; arquivo: string }
 
 export async function baixarExcelForecast(linhas: LinhaPlano[], periodo: DiaFluxo[], abertos: Set<string>, o: OpcoesExcel) {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Forecast", { views: [{ state: "frozen", xSplit: 1, showGridLines: false }] });
+  const ws = wb.addWorksheet("Forecast");
+  ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
   const nc = periodo.length + 2, moeda = '#,##0.00;[Red]-#,##0.00;"—"';
   const fonte = { name: "Arial", size: 10 };
   ws.getColumn(1).width = 38; for (let i = 2; i <= nc; i++) ws.getColumn(i).width = 14;
@@ -51,14 +52,20 @@ export async function baixarExcelForecast(linhas: LinhaPlano[], periodo: DiaFlux
     r.eachCell((c, i) => { if (i === o.kpis!.length) { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } }; c.font = { ...fonte, size: 12, bold: true, color: { argb: "FFFFFFFF" } }; } });
     add([]);
   }
-  const topo = ws.rowCount + 1;
-  for (let i = 0; i < 20; i++) add([]);
-  ws.addImage(wb.addImage({ base64: curvaPng(periodo, o.corte), extension: "png" }), { tl: { col: 0, row: topo - 1 }, ext: { width: 1100, height: 380 } });
+  if (o.incluirCurva !== false) {
+    const topo = ws.rowCount + 1;
+    for (let i = 0; i < 20; i++) add([]);
+    ws.addImage(wb.addImage({ base64: curvaPng(periodo, o.corte), extension: "png" }), { tl: { col: 0, row: topo - 1 }, ext: { width: 1100, height: 380 } });
+  }
   const azul = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF1E3A5F" } };
-  r = add(["Plano financeiro", ...periodo.map((d) => br(d.data)), "Total"]);
-  r.eachCell((c) => { c.fill = azul; c.font = { ...fonte, bold: true, color: { argb: "FFFFFFFF" } }; c.alignment = { horizontal: "center" }; });
+  const cabRow = add(["Plano financeiro", ...periodo.map((d) => br(d.data)), "Total"]);
+  cabRow.height = 24;
+  cabRow.eachCell((c) => { c.fill = azul; c.font = { ...fonte, bold: true, color: { argb: "FFFFFFFF" } }; c.alignment = { horizontal: "center", vertical: "middle" }; });
+  ws.views = [{ state: "frozen", xSplit: 1, ySplit: cabRow.number, showGridLines: false }];
   if (o.corte) { r = add(["", ...periodo.map((d) => (d.data > o.corte! ? "Projetado" : "Realizado")), ""]); r.font = { ...fonte, size: 8, italic: true, color: { argb: "FF64748B" } }; r.alignment = { horizontal: "center" }; }
   const borda = { style: "thin" as const, color: { argb: "FFD6D9DE" } };
+  const bordaConta = { style: "thin" as const, color: { argb: "FFB0C4DE" } };
+  const bordaGrupo = { style: "medium" as const, color: { argb: "FF94A3B8" } };
   const estilo = (row: ReturnType<typeof add>, extra: (c: any, i: number) => void = () => {}) => row.eachCell({ includeEmpty: true }, (c, i) => { c.border = { top: borda, bottom: borda, left: borda, right: borda }; if (i > 1) c.numFmt = moeda; c.font = { ...fonte, ...(c.font ?? {}) }; extra(c, i); });
   const proj = (i: number) => !!o.corte && (periodo[i - 2]?.data ?? "") > o.corte;
   const fundoProj = (c: any, i: number) => { if (proj(i) && !c.fill) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } }; };
@@ -66,17 +73,31 @@ export async function baixarExcelForecast(linhas: LinhaPlano[], periodo: DiaFlux
   const linha = (l: LinhaPlano, nivel: number) => {
     const cor = l.id.startsWith("credito") ? "FF15803D" : "FFB91C1C";
     const row = add([" ".repeat(nivel * 4) + l.rotulo, ...l.valores, l.total]);
-    if (l.filhos.length && !abertos.has(l.id)) { /* fechada */ }
+    if (nivel > 0) row.outlineLevel = nivel;
     estilo(row, (c, i) => {
-      c.font = { ...fonte, bold: nivel === 0 || i === nc, color: { argb: i === 1 ? (nivel === 2 ? "FF64748B" : "FF0F172A") : cor } };
-      if (nivel === 0) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF1F5" } }; else fundoProj(c, i);
+      const corRotulo = nivel === 0 ? "FF0F172A" : nivel === 1 ? "FF1E3A5F" : "FF475569";
+      c.font = { ...fonte, bold: nivel <= 1 || i === nc, color: { argb: i === 1 ? corRotulo : cor } };
+      if (nivel === 0) {
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCBD8E8" } };
+        c.border = { top: bordaGrupo, bottom: bordaGrupo, left: borda, right: borda };
+      } else if (nivel === 1) {
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE4EDF8" } };
+        c.border = { top: bordaConta, bottom: bordaConta, left: borda, right: borda };
+      } else {
+        fundoProj(c, i);
+      }
     });
     if (abertos.has(l.id)) l.filhos.forEach((f) => linha(f, nivel + 1));
   };
   linhas.forEach((l) => linha(l, 0));
   const [rc, pg] = linhas;
-  estilo(add(["Resultado do dia", ...periodo.map((_, i) => (rc?.valores[i] ?? 0) - (pg?.valores[i] ?? 0)), (rc?.total ?? 0) - (pg?.total ?? 0)]), (c, i) => { if (i === 1) c.font = { ...fonte, bold: true }; fundoProj(c, i); });
-  if (!o.semSaldo) estilo(add([o.corte ? "Saldo (realizado / projetado)" : "Saldo previsto", ...periodo.map((d) => d.final), null]), (c) => { c.font = { ...fonte, bold: true, color: { argb: typeof c.value === "number" && c.value < 0 ? "FFB91C1C" : "FF0F172A" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } }; });
+  let ultimaLinha = add(["Resultado do dia", ...periodo.map((_, i) => (rc?.valores[i] ?? 0) - (pg?.valores[i] ?? 0)), (rc?.total ?? 0) - (pg?.total ?? 0)]);
+  estilo(ultimaLinha, (c, i) => { if (i === 1) c.font = { ...fonte, bold: true }; fundoProj(c, i); });
+  if (!o.semSaldo) {
+    ultimaLinha = add([o.corte ? "Saldo (realizado / projetado)" : "Saldo previsto", ...periodo.map((d) => d.final), null]);
+    estilo(ultimaLinha, (c) => { c.font = { ...fonte, bold: true, color: { argb: typeof c.value === "number" && c.value < 0 ? "FFB91C1C" : "FF0F172A" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } }; });
+  }
+  ws.autoFilter = { from: { row: cabRow.number, column: 1 }, to: { row: ultimaLinha.number, column: nc } };
   add([]);
   r = add([`Gerado em ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`]); r.font = { ...fonte, size: 9, color: { argb: "FF64748B" } };
   const buf = await wb.xlsx.writeBuffer();
