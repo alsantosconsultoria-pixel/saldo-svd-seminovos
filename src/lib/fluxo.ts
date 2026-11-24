@@ -1,4 +1,6 @@
-export interface PrevItem { tipo: string; vencimento: string; valor: number }
+import { ehTransferenciaFinanceira } from "@/lib/plano";
+
+export interface PrevItem { tipo: string; vencimento: string; valor: number; categoria?: string }
 export interface DiaFluxo { data: string; inicial: number; receber: number; pagar: number; final: number; faltante: number }
 
 // Fluxo de caixa: começa no saldo atual dos bancos e soma/subtrai as previsões dia a dia.
@@ -6,6 +8,7 @@ export interface DiaFluxo { data: string; inicial: number; receber: number; paga
 export function fluxoCaixa(saldoInicial: number, itens: PrevItem[], hoje: string): DiaFluxo[] {
   const mapa = new Map<string, { r: number; p: number }>();
   for (const i of itens) {
+    if (ehTransferenciaFinanceira(i.categoria)) continue;
     const d = i.vencimento < hoje ? hoje : i.vencimento;
     const m = mapa.get(d) ?? { r: 0, p: 0 };
     if (i.tipo === "receber") m.r += Math.round(i.valor * 100); else m.p += Math.round(i.valor * 100);

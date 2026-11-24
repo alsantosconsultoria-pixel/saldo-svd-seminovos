@@ -1,5 +1,5 @@
 import type { DiaFluxo } from "@/lib/fluxo";
-import type { LinhaPlano } from "@/lib/plano";
+import type { LinhaPlano, MovimentacaoFluxo } from "@/lib/plano";
 
 const br = (d: string) => d.split("-").reverse().join("/");
 
@@ -31,7 +31,7 @@ function curvaPng(periodo: DiaFluxo[], corte?: string): string {
   return c.toDataURL("image/png").split(",")[1]!;
 }
 
-export interface OpcoesExcel { titulo: string; subtitulo?: string; corte?: string; kpis?: { t: string; v: number }[]; semSaldo?: boolean; incluirCurva?: boolean; arquivo: string }
+export interface OpcoesExcel { titulo: string; subtitulo?: string; corte?: string; kpis?: { t: string; v: number }[]; semSaldo?: boolean; incluirCurva?: boolean; movimentacoes?: MovimentacaoFluxo[]; arquivo: string }
 
 export async function baixarExcelForecast(linhas: LinhaPlano[], periodo: DiaFluxo[], abertos: Set<string>, o: OpcoesExcel) {
   const ExcelJS = (await import("exceljs")).default;
@@ -98,6 +98,21 @@ export async function baixarExcelForecast(linhas: LinhaPlano[], periodo: DiaFlux
     estilo(ultimaLinha, (c) => { c.font = { ...fonte, bold: true, color: { argb: typeof c.value === "number" && c.value < 0 ? "FFB91C1C" : "FF0F172A" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } }; });
   }
   ws.autoFilter = { from: { row: cabRow.number, column: 1 }, to: { row: ultimaLinha.number, column: nc } };
+  if (o.movimentacoes?.length) {
+    add([]);
+    r = add(["Movimentações (transferências entre contas · não compõem entradas nem saídas)"]);
+    r.font = { ...fonte, size: 11, bold: true, color: { argb: "FF1E3A5F" } };
+    const mCab = add(["Conta", "Data", "Tipo", "Contraparte", "Valor"]);
+    mCab.eachCell((c) => { c.fill = azul; c.font = { ...fonte, bold: true, color: { argb: "FFFFFFFF" } }; });
+    for (const m of o.movimentacoes) {
+      const mr = add([m.conta || "—", br(m.data), m.tipo === "entrada" ? "Entrada" : "Saída", m.contraparte || "—", m.valor]);
+      mr.eachCell({ includeEmpty: true }, (c, i) => {
+        c.border = { top: borda, bottom: borda, left: borda, right: borda };
+        c.font = { ...fonte, color: { argb: i === 5 ? (m.tipo === "entrada" ? "FF15803D" : "FFB91C1C") : "FF0F172A" } };
+        if (i === 5) c.numFmt = moeda;
+      });
+    }
+  }
   add([]);
   r = add([`Gerado em ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`]); r.font = { ...fonte, size: 9, color: { argb: "FF64748B" } };
   const buf = await wb.xlsx.writeBuffer();

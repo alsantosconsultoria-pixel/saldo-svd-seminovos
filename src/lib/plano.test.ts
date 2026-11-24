@@ -33,4 +33,28 @@ describe("forecast do painel", () => {
     const [, deb] = totaisPorPlano([{ tipo: "pagar", vencimento: "2026-01-01", categoria: "ICMS", valor: 10 }, { tipo: "pagar", vencimento: "2026-12-01", categoria: "ICMS", valor: 5 }], contas, { ICMS: "a" });
     expect(deb!.filhos[0]).toMatchObject({ rotulo: "Impostos", total: 15 });
   });
+  it("ignora transferência financeira de entrada e saída nos saldos e no fluxo", async () => {
+    const { ehTransferenciaFinanceira, itensForecast } = await import("./plano");
+    const { fluxoCaixa } = await import("./fluxo");
+    expect(ehTransferenciaFinanceira("MOVIMENTAÇÃO - TRANSFERÊNCIA FINANCEIRA - ENTRADA")).toBe(true);
+    expect(ehTransferenciaFinanceira("MOVIMENTAÇÃO - TRANSFERÊNCIA FINANCEIRA - SAIDA")).toBe(true);
+    expect(ehTransferenciaFinanceira("MOVIMENTAÇÃO - TRANSFERÊNCIA FINANCEIRA - SAIDAS")).toBe(true);
+    expect(ehTransferenciaFinanceira("MOVIMENTAÇÃO - EMPRÉSTIMOS")).toBe(false);
+    const itens = [
+      { tipo: "receber", vencimento: "2026-11-10", categoria: "MOVIMENTAÇÃO - TRANSFERÊNCIA FINANCEIRA - ENTRADA", valor: 50000 },
+      { tipo: "pagar", vencimento: "2026-11-10", categoria: "MOVIMENTAÇÃO - TRANSFERÊNCIA FINANCEIRA - SAIDA", valor: 50000 },
+      { tipo: "pagar", vencimento: "2026-11-10", categoria: "ICMS", valor: 100 },
+    ];
+    const [cred, deb] = fluxoPorPlano(itens, ["2026-11-10"], contas, { ICMS: "a" }, "2026-11-10");
+    expect(cred!.total).toBe(0);
+    expect(deb!.total).toBe(100);
+    const fc = fluxoCaixa(1000, itens, "2026-11-10");
+    expect(fc[0]).toMatchObject({ receber: 0, pagar: 100, final: 900 });
+    const forecast = itensForecast(
+      [{ tipo: "pagar", data: "2026-11-10", categoria: "MOVIMENTAÇÃO - TRANSFERÊNCIA FINANCEIRA - SAIDAS", valor: 35000 }],
+      itens,
+      "2026-11-10",
+    );
+    expect(forecast).toEqual([]);
+  });
 });

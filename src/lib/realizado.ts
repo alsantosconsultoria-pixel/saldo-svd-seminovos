@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import type { Extrato, Transacao } from "@/lib/extrato/parser";
 import { data, norm, pega, pegaMarcador, valor } from "@/lib/importar-previsoes";
+import { ehTransferenciaFinanceira } from "@/lib/plano";
 
 export interface Realizado {
   id: string; chave: string; tipo: "pagar" | "receber"; data: string; conta: string;
@@ -67,10 +68,11 @@ export function associar(realizados: Realizado[], extratos: Extrato[]) {
 }
 
 export interface DiaRealizado { data: string; pago: number; recebido: number }
-export function realizadoPorDia(realizados: Pick<Realizado, "data" | "tipo" | "valor">[], de: string, ate: string): DiaRealizado[] {
+export function realizadoPorDia(realizados: (Pick<Realizado, "data" | "tipo" | "valor"> & { categoria?: string })[], de: string, ate: string): DiaRealizado[] {
   const m = new Map<string, DiaRealizado>();
   for (const r of realizados) {
     if (r.data < de || r.data > ate) continue;
+    if (ehTransferenciaFinanceira(r.categoria)) continue;
     const d = m.get(r.data) ?? { data: r.data, pago: 0, recebido: 0 };
     if (r.tipo === "pagar") d.pago = Math.round((d.pago + r.valor) * 100) / 100; else d.recebido = Math.round((d.recebido + r.valor) * 100) / 100;
     m.set(r.data, d);

@@ -19,7 +19,7 @@ import { realizadoPorDia, type Realizado } from "@/lib/realizado";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FluxoPlano, baixarExcelPlano } from "@/components/FluxoPlano";
 import { baixarExcelForecast } from "@/lib/excel-forecast";
-import { fluxoPorPlano, type ContaPlano, type LinhaPlano } from "@/lib/plano";
+import { ehTransferenciaFinanceira, fluxoPorPlano, type ContaPlano, type LinhaPlano, type MovimentacaoFluxo } from "@/lib/plano";
 
 interface Prev { id: string; tipo: string; vencimento: string; descricao: string; contraparte: string; documento: string; banco: string; categoria: string; valor: number; marcador?: string }
 
@@ -72,11 +72,20 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
   const planoReal = useMemo(() => fluxoPorPlano(realizados.map((r) => ({ tipo: r.tipo, vencimento: r.data, categoria: r.categoria, valor: r.valor })), diasReal.map((d) => d.data), contas, mapa, ""), [realizados, diasReal, contas, mapa]);
   const tituloRel = periodo.length ? `Fluxo de caixa previsto · ${fmtData(periodo[0]!.data)} a ${fmtData(periodo.at(-1)!.data)}` : "";
   const noPeriodo = (i: Prev) => { const v = i.vencimento < dia ? dia : i.vencimento; return v >= ini && v <= ate; };
-  const rec = itens.filter((i) => i.tipo === "receber" && noPeriodo(i));
-  const pag = itens.filter((i) => i.tipo === "pagar" && noPeriodo(i));
+  const rec = itens.filter((i) => i.tipo === "receber" && noPeriodo(i) && !ehTransferenciaFinanceira(i.categoria));
+  const pag = itens.filter((i) => i.tipo === "pagar" && noPeriodo(i) && !ehTransferenciaFinanceira(i.categoria));
+  const movimentacoes = useMemo<MovimentacaoFluxo[]>(() => {
+    const dePrev: MovimentacaoFluxo[] = itens
+      .filter((i) => ehTransferenciaFinanceira(i.categoria) && noPeriodo(i))
+      .map((i) => ({ id: `p-${i.id}`, data: i.vencimento < dia ? dia : i.vencimento, tipo: i.tipo === "receber" ? "entrada" : "saida", conta: i.banco || "—", contraparte: i.contraparte || "", valor: i.valor }));
+    const deReal: MovimentacaoFluxo[] = realizados
+      .filter((r) => ehTransferenciaFinanceira(r.categoria) && r.data >= de && r.data <= ate)
+      .map((r) => ({ id: `r-${r.id}`, data: r.data, tipo: r.tipo === "receber" ? "entrada" : "saida", conta: r.conta || "—", contraparte: r.contraparte || "", valor: r.valor }));
+    return [...deReal, ...dePrev].sort((a, b) => a.data.localeCompare(b.data) || a.conta.localeCompare(b.conta));
+  }, [itens, realizados, de, ini, ate, dia]); // eslint-disable-line react-hooks/exhaustive-deps
   const linhaDe = (i: Prev) => { const cat = i.categoria || "Sem categoria"; const c = contas.find((x) => x.id === mapa[cat]); return `${i.tipo === "receber" ? "credito" : "debito"}|${c ? c.nome.trim() : "_sem"}|${cat}`; };
-  const marcados = useMemo(() => { if (!comMarcador) return undefined; const m = new Map<string, number>(); for (const i of itens) if (i.marcador && noPeriodo(i)) m.set(linhaDe(i), (m.get(linhaDe(i)) ?? 0) + 1); return m; }, [comMarcador, itens, contas, mapa, ini, ate]); // eslint-disable-line react-hooks/exhaustive-deps
-  const itensComp = comp ? itens.filter((i) => noPeriodo(i) && linhaDe(i) === comp.id).sort((a, b) => a.vencimento.localeCompare(b.vencimento)) : [];
+  const marcados = useMemo(() => { if (!comMarcador) return undefined; const m = new Map<string, number>(); for (const i of itens) if (i.marcador && noPeriodo(i) && !ehTransferenciaFinanceira(i.categoria)) m.set(linhaDe(i), (m.get(linhaDe(i)) ?? 0) + 1); return m; }, [comMarcador, itens, contas, mapa, ini, ate]); // eslint-disable-line react-hooks/exhaustive-deps
+  const itensComp = comp ? itens.filter((i) => noPeriodo(i) && !ehTransferenciaFinanceira(i.categoria) && linhaDe(i) === comp.id).sort((a, b) => a.vencimento.localeCompare(b.vencimento)) : [];
   const onComp = (id: string, rotulo: string) => setComp({ id, rotulo });
   const baseExtratos = lista.map((e) => ultimoSaldoExtrato(e).data).filter(Boolean).sort().at(-1) ?? "";
   const soma = (l: Prev[]) => l.reduce((a, b) => a + b.valor, 0);
@@ -108,12 +117,12 @@ export function Previsoes({ lista, atualizacao = 0, realizados = [] }: { lista: 
         <div className="flex flex-wrap items-center gap-2">
           {relatorio && <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm"><Checkbox checked={comCurva} onCheckedChange={(v) => setComCurva(v === true)} /> Curva do saldo</label>}
           <Button variant="outline" onClick={() => setRelatorio((r) => !r)} disabled={!periodo.length}><FileText /> {relatorio ? "Voltar às previsões" : "Relatório de fluxo"}</Button>
-          {relatorio && <Button variant="outline" onClick={() => void baixarExcelForecast(plano, periodo, abertos, { titulo: tituloRel, incluirCurva: comCurva, arquivo: `fluxo-forecast-${periodo[0]?.data ?? ""}-a-${periodo.at(-1)?.data ?? ""}.xlsx` })}><FileText /> Baixar Excel</Button>}
+          {relatorio && <Button variant="outline" onClick={() => void baixarExcelForecast(plano, periodo, abertos, { titulo: tituloRel, incluirCurva: comCurva, movimentacoes, arquivo: `fluxo-forecast-${periodo[0]?.data ?? ""}-a-${periodo.at(-1)?.data ?? ""}.xlsx` })}><FileText /> Baixar Excel</Button>}
           {relatorio && <Button onClick={() => window.print()}><Printer /> Baixar PDF</Button>}
         </div>
       </Card>
 
-      {relatorio && periodo.length > 0 ? <RelatorioFluxo periodo={periodo} saldoBancos={saldoBancos} base={baseExtratos} receber={soma(rec)} pagar={soma(pag)} maiores={[...pag].sort((a, b) => b.valor - a.valor).slice(0, 8)} plano={plano} abertos={abertos} setAbertos={setAbertos} marcados={marcados} onComposicao={onComp} incluirCurva={comCurva} /> : <>
+      {relatorio && periodo.length > 0 ? <RelatorioFluxo periodo={periodo} saldoBancos={saldoBancos} base={baseExtratos} receber={soma(rec)} pagar={soma(pag)} maiores={[...pag].sort((a, b) => b.valor - a.valor).slice(0, 8)} plano={plano} abertos={abertos} setAbertos={setAbertos} marcados={marcados} onComposicao={onComp} incluirCurva={comCurva} movimentacoes={movimentacoes} /> : <>
       <div className="grid gap-4 sm:grid-cols-4">
         <Card className="p-4"><div className="text-xs text-muted-foreground">Saldo dos bancos {baseExtratos && `(extratos até ${fmtData(baseExtratos)})`}</div><div className="num text-lg font-semibold">{fmt(saldoBancos)}</div></Card>
         <Card className="p-4"><div className="text-xs text-muted-foreground">A receber no período</div><div className="num text-lg font-semibold text-credit">{fmt(soma(rec))}</div></Card>
@@ -200,7 +209,7 @@ function Curva({ periodo }: { periodo: DiaFluxo[] }) {
 }
 
 
-function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, plano, abertos, setAbertos, marcados, onComposicao, incluirCurva }: { periodo: DiaFluxo[]; saldoBancos: number; base: string; receber: number; pagar: number; maiores: Prev[]; plano: LinhaPlano[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number> | undefined; onComposicao?: ((id: string, rotulo: string) => void) | undefined; incluirCurva: boolean }) {
+function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, plano, abertos, setAbertos, marcados, onComposicao, incluirCurva, movimentacoes }: { periodo: DiaFluxo[]; saldoBancos: number; base: string; receber: number; pagar: number; maiores: Prev[]; plano: LinhaPlano[]; abertos: Set<string>; setAbertos: (s: Set<string>) => void; marcados?: Map<string, number> | undefined; onComposicao?: ((id: string, rotulo: string) => void) | undefined; incluirCurva: boolean; movimentacoes: MovimentacaoFluxo[] }) {
   const final = periodo.at(-1)?.final ?? saldoBancos;
   const menor = periodo.reduce((m, d) => (d.final < m.final ? d : m), periodo[0]!);
   const criticos = periodo.filter((d) => d.faltante > 0);
@@ -229,6 +238,24 @@ function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, p
       {falta > 0 && <p className="mt-2 text-sm font-semibold text-debit">Maior falta diária para pagamentos: {fmt(falta)}.</p>}
     </section>
     <section><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">02 · Fluxo por plano financeiro</h2><FluxoPlano linhas={plano} periodo={periodo} abertos={abertos} setAbertos={setAbertos} marcados={marcados} onComposicao={onComposicao} /></section>
+    {movimentacoes.length > 0 && (
+      <section className="break-inside-avoid">
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Movimentações</h2>
+        <p className="mb-3 text-xs text-muted-foreground">Transferências financeiras entre contas. Já refletidas nos saldos — não compõem entradas nem saídas do fluxo.</p>
+        <div className="overflow-x-auto"><table className="w-full text-sm">
+          <thead><tr className="border-b text-left text-[11px] uppercase tracking-wider text-muted-foreground"><th className="py-1.5 font-medium">Data</th><th className="font-medium">Conta</th><th className="font-medium">Tipo</th><th className="font-medium">Contraparte</th><th className="text-right font-medium">Valor</th></tr></thead>
+          <tbody>{movimentacoes.map((m) => (
+            <tr key={m.id} className="border-b">
+              <td className="num py-1.5">{fmtData(m.data)}</td>
+              <td className="font-medium">{m.conta}</td>
+              <td className="text-xs text-muted-foreground">{m.tipo === "entrada" ? "Entrada" : "Saída"}</td>
+              <td className="text-xs text-muted-foreground">{m.contraparte || "—"}</td>
+              <td className={`num text-right ${m.tipo === "entrada" ? "text-credit" : "text-debit"}`}>{fmt(m.valor)}</td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      </section>
+    )}
     {incluirCurva && <section className="break-inside-avoid"><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">03 · Curva do saldo</h2><Curva periodo={periodo} /></section>}
     {maiores.length > 0 && <section className="break-inside-avoid"><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">{incluirCurva ? "04" : "03"} · Maiores pagamentos do período</h2>
       <table className="w-full text-sm"><thead><tr className="border-b text-left text-[11px] uppercase tracking-wider text-muted-foreground"><th className="py-1.5 font-medium">Vencimento</th><th className="font-medium">Fornecedor</th><th className="font-medium">Categoria</th><th className="font-medium">Marcador</th><th className="text-right font-medium">Valor</th></tr></thead><tbody>{maiores.map((m) => <tr key={m.id} className="border-b"><td className="num py-1.5">{fmtData(m.vencimento)}</td><td>{m.contraparte || "—"}</td><td className="text-muted-foreground">{m.categoria}</td><td className="text-xs text-muted-foreground">{m.marcador ? <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"><Tag className="size-3" />{m.marcador}</span> : "—"}</td><td className="num text-right">{fmt(m.valor)}</td></tr>)}</tbody></table>
@@ -245,7 +272,7 @@ function RealizadoLinha({ realizados, de, ate }: { realizados: Realizado[]; de: 
   const cel = "num whitespace-nowrap border-l px-3 py-2 text-right";
   const rot = "sticky left-0 z-10 whitespace-nowrap bg-card px-3 py-2 text-left font-medium";
   const link = (d: string, tipo: "pagar" | "receber", v: number, cor: string) => v ? <button type="button" className={`${cor} underline decoration-dotted underline-offset-4 hover:opacity-70`} onClick={() => setAberto({ data: d, tipo })}>{n(v)}</button> : "—";
-  const comp = aberto ? realizados.filter((r) => r.data === aberto.data && r.tipo === aberto.tipo) : [];
+  const comp = aberto ? realizados.filter((r) => r.data === aberto.data && r.tipo === aberto.tipo && !ehTransferenciaFinanceira(r.categoria)) : [];
   return <>
     <div className="overflow-x-auto"><table className="w-full border-collapse text-sm">
       <thead><tr className="border-b bg-muted/40"><th className={rot + " bg-muted"}>Data</th>{dias.map((d) => <th key={d.data} className={cel + " font-semibold"}>{fmtData(d.data).slice(0, 5)}</th>)}</tr></thead>

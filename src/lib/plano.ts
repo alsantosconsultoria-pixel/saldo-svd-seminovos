@@ -1,6 +1,14 @@
 export interface ContaPlano { id: string; codigo: string; nome: string; tipo: "credito" | "debito" }
 export interface ItemPlano { tipo: string; vencimento: string; categoria: string; valor: number }
 export interface LinhaPlano { id: string; rotulo: string; valores: number[]; total: number; filhos: LinhaPlano[] }
+export interface MovimentacaoFluxo { id: string; data: string; tipo: "entrada" | "saida"; conta: string; contraparte: string; valor: number }
+
+// Categorias de transferência financeira entre contas: já refletidas no saldo, não compõem entradas/saídas.
+export function ehTransferenciaFinanceira(categoria?: string | null): boolean {
+  if (!categoria) return false;
+  const n = categoria.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+  return /^MOVIMENTACAO\s*-\s*TRANSFERENCIA FINANCEIRA\s*-\s*(ENTRADAS?|SAIDAS?)$/.test(n);
+}
 
 const cent = (v: number) => Math.round(v * 100);
 
@@ -14,6 +22,7 @@ export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaP
     const contasMap = new Map<string, Map<string, number[]>>();
     const ordemNome = new Map<string, string>();
     for (const i of itens) {
+      if (ehTransferenciaFinanceira(i.categoria)) continue;
       if ((i.tipo === "receber") !== (g.tipo === "receber")) continue;
       const d = idx.get(i.vencimento < hoje ? hoje : i.vencimento);
       if (d === undefined) continue;
@@ -28,6 +37,7 @@ export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaP
     }
     // Todas as categorias associadas às contas deste grupo aparecem, mesmo sem valor no período.
     for (const [cat, cid] of Object.entries(mapa)) {
+      if (ehTransferenciaFinanceira(cat)) continue;
       const c0 = porId.get(cid);
       if (!c0 || c0.tipo !== g.id) continue;
       const nome = c0.nome.trim();
@@ -68,8 +78,8 @@ export function idLinhaPlano(tipo: string, categoria: string, contas: ContaPlano
 // Forecast: realizado até o corte (inclusive) e previsões depois do corte.
 export function itensForecast(realizados: { tipo: string; data: string; categoria: string; valor: number }[], previsoes: ItemPlano[], corte: string): ItemPlano[] {
   return [
-    ...realizados.filter((r) => r.data <= corte).map((r) => ({ tipo: r.tipo, vencimento: r.data, categoria: r.categoria, valor: r.valor })),
-    ...previsoes.filter((p) => p.vencimento > corte),
+    ...realizados.filter((r) => r.data <= corte && !ehTransferenciaFinanceira(r.categoria)).map((r) => ({ tipo: r.tipo, vencimento: r.data, categoria: r.categoria, valor: r.valor })),
+    ...previsoes.filter((p) => p.vencimento > corte && !ehTransferenciaFinanceira(p.categoria)),
   ];
 }
 
