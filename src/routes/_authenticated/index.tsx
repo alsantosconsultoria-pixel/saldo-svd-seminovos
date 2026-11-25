@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,6 +88,7 @@ function Index() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível ler a planilha.", { id: aviso }); }
   }
   const [relatorioPainel, setRelatorioPainel] = useState(false);
+  const [curvaPainel, setCurvaPainel] = useState(false);
   const [aba, setAba] = useState("painel");
   const [lancDe, setLancDe] = useState("");
   const [lancConta, setLancConta] = useState("todas");
@@ -401,10 +403,11 @@ function Index() {
               <h2 className="text-xl font-semibold">Demonstração gerencial</h2>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setRelatorioPainel((v) => !v)}><FileText />{relatorioPainel ? "Voltar ao Painel" : "Relatório do Painel"}</Button>
+                {relatorioPainel && <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm"><Checkbox checked={curvaPainel} onCheckedChange={(v) => setCurvaPainel(v === true)} /> Curva do saldo</label>}
                 {relatorioPainel && <><Button onClick={() => window.print()}><Printer /> Imprimir / PDF</Button><CompartilharRelatorio titulo="Demonstrativo gerencial de saldos · Grupo SVD" resumo={`Contas selecionadas: ${ativos.length}. Saldo inicial: ${fmt(saldoIni)}. Saldo final (último dia do extrato): ${fmt(saldoFim)}.`} arquivo={`painel-${hojeIso}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} /></>}
               </div>
             </div>
-            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} periodo={forecast.periodo} corte={corte} linhas={forecast.linhas} saldoIni={forecast.saldoIni} realE={forecast.realE} realS={forecast.realS} projE={forecast.projE} projS={forecast.projS} maiores={maioresPlano} onCategoria={abrirCategoria} movimentacoes={forecast.movimentacoes} /></div>}
+            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} periodo={forecast.periodo} corte={corte} linhas={forecast.linhas} saldoIni={forecast.saldoIni} realE={forecast.realE} realS={forecast.realS} projE={forecast.projE} projS={forecast.projS} maiores={maioresPlano} onCategoria={abrirCategoria} movimentacoes={forecast.movimentacoes} incluirCurva={curvaPainel} /></div>}
             <div className={`dashboard-editor space-y-4 ${relatorioPainel ? "hidden" : ""}`}>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
