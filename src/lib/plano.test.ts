@@ -57,4 +57,20 @@ describe("forecast do painel", () => {
     );
     expect(forecast).toEqual([]);
   });
+  it("concilia movimentações e isola valores sem par quando o saldo não zera", async () => {
+    const { conciliarMovimentacoes } = await import("./plano");
+    const ok = conciliarMovimentacoes([
+      { id: "1", data: "2026-11-10", tipo: "entrada", conta: "Itaú", contraparte: "", valor: 1000 },
+      { id: "2", data: "2026-11-10", tipo: "saida", conta: "Santander", contraparte: "", valor: 1000 },
+    ]);
+    expect(ok).toEqual({ saldo: 0, divergentes: [] });
+
+    const div = conciliarMovimentacoes([
+      { id: "1", data: "2026-11-10", tipo: "entrada", conta: "Itaú", contraparte: "", valor: 1000 },
+      { id: "2", data: "2026-11-10", tipo: "saida", conta: "Santander", contraparte: "", valor: 1000 },
+      { id: "3", data: "2026-11-11", tipo: "saida", conta: "Sicoob", contraparte: "", valor: 250.5 },
+    ]);
+    expect(div.saldo).toBe(-250.5);
+    expect(div.divergentes.map((m) => m.id)).toEqual(["3"]);
+  });
 });

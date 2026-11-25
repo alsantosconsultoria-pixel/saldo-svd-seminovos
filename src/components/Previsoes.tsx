@@ -18,6 +18,7 @@ import { analisarFluxo } from "@/lib/fluxo-ia.functions";
 import { realizadoPorDia, type Realizado } from "@/lib/realizado";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FluxoPlano, baixarExcelPlano } from "@/components/FluxoPlano";
+import { MovimentacoesRelatorio } from "@/components/MovimentacoesRelatorio";
 import { baixarExcelForecast } from "@/lib/excel-forecast";
 import { ehTransferenciaFinanceira, fluxoPorPlano, type ContaPlano, type LinhaPlano, type MovimentacaoFluxo } from "@/lib/plano";
 
@@ -240,20 +241,8 @@ function RelatorioFluxo({ periodo, saldoBancos, base, receber, pagar, maiores, p
     <section><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">02 · Fluxo por plano financeiro</h2><FluxoPlano linhas={plano} periodo={periodo} abertos={abertos} setAbertos={setAbertos} marcados={marcados} onComposicao={onComposicao} /></section>
     {movimentacoes.length > 0 && (
       <section className="break-inside-avoid">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Movimentações</h2>
-        <p className="mb-3 text-xs text-muted-foreground">Transferências financeiras entre contas. Já refletidas nos saldos — não compõem entradas nem saídas do fluxo.</p>
-        <div className="overflow-x-auto"><table className="w-full text-sm">
-          <thead><tr className="border-b text-left text-[11px] uppercase tracking-wider text-muted-foreground"><th className="py-1.5 font-medium">Data</th><th className="font-medium">Conta</th><th className="font-medium">Tipo</th><th className="font-medium">Contraparte</th><th className="text-right font-medium">Valor</th></tr></thead>
-          <tbody>{movimentacoes.map((m) => (
-            <tr key={m.id} className="border-b">
-              <td className="num py-1.5">{fmtData(m.data)}</td>
-              <td className="font-medium">{m.conta}</td>
-              <td className="text-xs text-muted-foreground">{m.tipo === "entrada" ? "Entrada" : "Saída"}</td>
-              <td className="text-xs text-muted-foreground">{m.contraparte || "—"}</td>
-              <td className={`num text-right ${m.tipo === "entrada" ? "text-credit" : "text-debit"}`}>{fmt(m.valor)}</td>
-            </tr>
-          ))}</tbody>
-        </table></div>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Movimentações</h2>
+        <MovimentacoesRelatorio movimentacoes={movimentacoes} />
       </section>
     )}
     {incluirCurva && <section className="break-inside-avoid"><h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">03 · Curva do saldo</h2><Curva periodo={periodo} /></section>}

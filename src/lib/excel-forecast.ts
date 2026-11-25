@@ -1,5 +1,5 @@
 import type { DiaFluxo } from "@/lib/fluxo";
-import type { LinhaPlano, MovimentacaoFluxo } from "@/lib/plano";
+import { conciliarMovimentacoes, type LinhaPlano, type MovimentacaoFluxo } from "@/lib/plano";
 
 const br = (d: string) => d.split("-").reverse().join("/");
 
@@ -99,18 +99,42 @@ export async function baixarExcelForecast(linhas: LinhaPlano[], periodo: DiaFlux
   }
   ws.autoFilter = { from: { row: cabRow.number, column: 1 }, to: { row: ultimaLinha.number, column: nc } };
   if (o.movimentacoes?.length) {
+    const { saldo, divergentes } = conciliarMovimentacoes(o.movimentacoes);
     add([]);
     r = add(["Movimentações (transferências entre contas · não compõem entradas nem saídas)"]);
     r.font = { ...fonte, size: 11, bold: true, color: { argb: "FF1E3A5F" } };
     const mCab = add(["Conta", "Data", "Tipo", "Contraparte", "Valor"]);
     mCab.eachCell((c) => { c.fill = azul; c.font = { ...fonte, bold: true, color: { argb: "FFFFFFFF" } }; });
     for (const m of o.movimentacoes) {
-      const mr = add([m.conta || "—", br(m.data), m.tipo === "entrada" ? "Entrada" : "Saída", m.contraparte || "—", m.valor]);
+      const val = m.tipo === "saida" ? -m.valor : m.valor;
+      const mr = add([m.conta || "—", br(m.data), m.tipo === "entrada" ? "Entrada" : "Saída", m.contraparte || "—", val]);
       mr.eachCell({ includeEmpty: true }, (c, i) => {
         c.border = { top: borda, bottom: borda, left: borda, right: borda };
         c.font = { ...fonte, color: { argb: i === 5 ? (m.tipo === "entrada" ? "FF15803D" : "FFB91C1C") : "FF0F172A" } };
         if (i === 5) c.numFmt = moeda;
       });
+    }
+    const mTot = add(["Saldo das movimentações", "", "", "", saldo]);
+    mTot.eachCell({ includeEmpty: true }, (c, i) => {
+      c.border = { top: borda, bottom: borda, left: borda, right: borda };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: saldo !== 0 ? "FFFEE2E2" : "FFE2E8F0" } };
+      c.font = { ...fonte, bold: true, color: { argb: saldo !== 0 ? "FFB91C1C" : "FF0F172A" } };
+      if (i === 5) c.numFmt = moeda;
+    });
+    if (saldo !== 0 && divergentes.length) {
+      add([]);
+      r = add(["Valores sem correspondência (verificar ajuste ou correção)"]);
+      r.font = { ...fonte, size: 10, bold: true, color: { argb: "FFB91C1C" } };
+      for (const m of divergentes) {
+        const val = m.tipo === "saida" ? -m.valor : m.valor;
+        const dr = add([m.conta || "—", br(m.data), m.tipo === "entrada" ? "Entrada" : "Saída", m.contraparte || "—", val]);
+        dr.eachCell({ includeEmpty: true }, (c, i) => {
+          c.border = { top: borda, bottom: borda, left: borda, right: borda };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF2F2" } };
+          c.font = { ...fonte, color: { argb: i === 5 ? (m.tipo === "entrada" ? "FF15803D" : "FFB91C1C") : "FF0F172A" } };
+          if (i === 5) c.numFmt = moeda;
+        });
+      }
     }
   }
   add([]);

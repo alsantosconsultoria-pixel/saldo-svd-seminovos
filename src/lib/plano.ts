@@ -12,6 +12,27 @@ export function ehTransferenciaFinanceira(categoria?: string | null): boolean {
 
 const cent = (v: number) => Math.round(v * 100);
 
+// Concilia transferências entre contas: entradas (+) e saídas (-) devem zerar.
+// Quando o saldo não bate zero, isola os lançamentos sem par (mesmo valor, priorizando mesma data).
+export function conciliarMovimentacoes(movs: MovimentacaoFluxo[]): { saldo: number; divergentes: MovimentacaoFluxo[] } {
+  const saldoCent = movs.reduce((s, m) => s + (m.tipo === "entrada" ? cent(m.valor) : -cent(m.valor)), 0);
+  const saldo = saldoCent / 100;
+  if (saldoCent === 0) return { saldo: 0, divergentes: [] };
+  const usados = new Set<string>();
+  const entradas = movs.filter((m) => m.tipo === "entrada");
+  const saidas = movs.filter((m) => m.tipo === "saida");
+  const parear = (mesmaData: boolean) => {
+    for (const e of entradas) {
+      if (usados.has(e.id)) continue;
+      const par = saidas.find((s) => !usados.has(s.id) && cent(s.valor) === cent(e.valor) && (!mesmaData || s.data === e.data));
+      if (par) { usados.add(e.id); usados.add(par.id); }
+    }
+  };
+  parear(true);
+  parear(false);
+  return { saldo, divergentes: movs.filter((m) => !usados.has(m.id)) };
+}
+
 // Agrupa as previsões por grupo (Créditos/Débitos) → conta do plano → categoria, dia a dia.
 // Vencidos entram em `hoje`, igual ao fluxo de caixa. Categoria sem conta vai para "Sem conta associada".
 export function fluxoPorPlano(itens: ItemPlano[], dias: string[], contas: ContaPlano[], mapa: Record<string, string>, hoje: string): LinhaPlano[] {

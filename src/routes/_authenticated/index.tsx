@@ -22,7 +22,7 @@ import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
 import { ResumoPlano } from "@/components/ResumoPlano";
-import { aplicarProgramacao, type Programacao, fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
+import { aplicarProgramacao, ehTransferenciaFinanceira, type MovimentacaoFluxo, type Programacao, fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
 import type { DiaFluxo } from "@/lib/fluxo";
 import { CompartilharRelatorio } from "@/components/CompartilharRelatorio";
 import { SeloExtrato, SinaleiroSaldos } from "@/components/StatusExtrato";
@@ -166,14 +166,14 @@ function Index() {
   const [planoContas, setPlanoContas] = useState<ContaPlano[]>([]);
   const [planoMapa, setPlanoMapa] = useState<Record<string, string>>({});
   const [programas, setProgramas] = useState<Programacao[]>([]);
-  const [prevs, setPrevs] = useState<{ id: string; tipo: string; vencimento: string; categoria: string; valor: number }[]>([]);
+  const [prevs, setPrevs] = useState<{ id: string; tipo: string; vencimento: string; categoria: string; valor: number; banco: string; contraparte: string }[]>([]);
   useEffect(() => {
     const ler = async () => {
-      const [c, m, p, sel] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("id,tipo,vencimento,categoria,valor"), supabase.from("tratativa_selecao").select("dia,desmarcados,incluidos,manuais")]);
+      const [c, m, p, sel] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("id,tipo,vencimento,categoria,valor,banco,contraparte"), supabase.from("tratativa_selecao").select("dia,desmarcados,incluidos,manuais")]);
       setProgramas((sel.data ?? []).map((g) => ({ dia: g.dia, desmarcados: g.desmarcados ?? [], incluidos: g.incluidos ?? [], manuais: (g.manuais as unknown as Programacao["manuais"]) ?? [] })));
       setPlanoContas((c.data ?? []) as ContaPlano[]);
       setPlanoMapa(Object.fromEntries((m.data ?? []).map((x) => [x.categoria, x.conta_id])));
-      setPrevs((p.data ?? []).map((x) => ({ ...x, valor: Number(x.valor), vencimento: proximoDiaUtil(x.vencimento) })));
+      setPrevs((p.data ?? []).map((x) => ({ ...x, valor: Number(x.valor), vencimento: proximoDiaUtil(x.vencimento), banco: x.banco ?? "", contraparte: x.contraparte ?? "" })));
     };
     ler();
     const ch = supabase.channel("painel-plano").on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_categorias" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "tratativa_selecao" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_contas" }, ler).subscribe();
@@ -208,7 +208,14 @@ function Index() {
       return { data, inicial, receber: r, pagar: p, final: saldo, faltante: saldo < 0 ? Math.min(-saldo, p) : 0 };
     });
     const soma = (t: string, proj: boolean) => itens.filter((x) => x.tipo === t && (x.vencimento > corte) === proj).reduce((a, x) => a + x.valor, 0);
-    return { linhas, periodo, saldoIni: ini0, realE: soma("receber", false), realS: soma("pagar", false), projE: soma("receber", true), projS: soma("pagar", true) };
+    const movReal: MovimentacaoFluxo[] = realizados
+      .filter((r) => r.data >= fcDe && r.data <= fcAte && r.data <= corte && ehTransferenciaFinanceira(r.categoria))
+      .map((r) => ({ id: `r-${r.id}`, data: r.data, tipo: r.tipo === "receber" ? "entrada" : "saida", conta: r.conta || "—", contraparte: r.contraparte || "", valor: r.valor }));
+    const movPrev: MovimentacaoFluxo[] = prevs
+      .filter((p) => p.vencimento >= fcDe && p.vencimento <= fcAte && p.vencimento > corte && ehTransferenciaFinanceira(p.categoria))
+      .map((p) => ({ id: `p-${p.id}`, data: p.vencimento, tipo: p.tipo === "receber" ? "entrada" : "saida", conta: p.banco || "—", contraparte: p.contraparte || "", valor: p.valor }));
+    const movimentacoes = [...movReal, ...movPrev].sort((a, b) => a.data.localeCompare(b.data) || a.conta.localeCompare(b.conta));
+    return { linhas, periodo, saldoIni: ini0, realE: soma("receber", false), realS: soma("pagar", false), projE: soma("receber", true), projS: soma("pagar", true), movimentacoes };
   }, [fcDe, fcAte, realizados, prevs, planoContas, planoMapa, ativos, corte, programas]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function importar(files: File[]) {
@@ -397,7 +404,7 @@ function Index() {
                 {relatorioPainel && <><Button onClick={() => window.print()}><Printer /> Imprimir / PDF</Button><CompartilharRelatorio titulo="Demonstrativo gerencial de saldos · Grupo SVD" resumo={`Contas selecionadas: ${ativos.length}. Saldo inicial: ${fmt(saldoIni)}. Saldo final (último dia do extrato): ${fmt(saldoFim)}.`} arquivo={`painel-${hojeIso}`} obterRelatorio={() => relatorioRef.current?.querySelector("article") ?? null} /></>}
               </div>
             </div>
-            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} periodo={forecast.periodo} corte={corte} linhas={forecast.linhas} saldoIni={forecast.saldoIni} realE={forecast.realE} realS={forecast.realS} projE={forecast.projE} projS={forecast.projS} maiores={maioresPlano} onCategoria={abrirCategoria} /></div>}
+            {relatorioPainel && <div ref={relatorioRef} className="treasury-report-container"><RelatorioPainel contas={ativos} periodo={forecast.periodo} corte={corte} linhas={forecast.linhas} saldoIni={forecast.saldoIni} realE={forecast.realE} realS={forecast.realS} projE={forecast.projE} projS={forecast.projS} maiores={maioresPlano} onCategoria={abrirCategoria} movimentacoes={forecast.movimentacoes} /></div>}
             <div className={`dashboard-editor space-y-4 ${relatorioPainel ? "hidden" : ""}`}>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">

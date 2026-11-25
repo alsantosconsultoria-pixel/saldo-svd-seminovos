@@ -8,18 +8,19 @@ import { type Extrato } from "@/lib/extrato/parser";
 import { saldoNaData, ultimoSaldoExtrato } from "@/lib/tratativas";
 import { fmt, fmtData } from "@/lib/extrato/store";
 import type { DiaFluxo } from "@/lib/fluxo";
-import type { LinhaPlano } from "@/lib/plano";
+import type { LinhaPlano, MovimentacaoFluxo } from "@/lib/plano";
 import { FluxoPlano } from "@/components/FluxoPlano";
+import { MovimentacoesRelatorio } from "@/components/MovimentacoesRelatorio";
 import { ResumoPlano } from "@/components/ResumoPlano";
 
 interface Props {
   contas: Extrato[]; periodo: DiaFluxo[]; corte: string; linhas: LinhaPlano[];
   saldoIni: number; realE: number; realS: number; projE: number; projS: number;
-  maiores: LinhaPlano[]; onCategoria: (id: string, rotulo: string) => void;
+  maiores: LinhaPlano[]; onCategoria: (id: string, rotulo: string) => void; movimentacoes?: MovimentacaoFluxo[];
 }
 
 // Relatório gerencial em formato de forecast: realizado até o corte e projeção depois, por conta financeira.
-export function RelatorioPainel({ contas, periodo, corte, linhas, saldoIni, realE, realS, projE, projS, maiores, onCategoria }: Props) {
+export function RelatorioPainel({ contas, periodo, corte, linhas, saldoIni, realE, realS, projE, projS, maiores, onCategoria, movimentacoes = [] }: Props) {
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const inicio = periodo[0]?.data, fim = periodo.at(-1)?.data;
   const final = periodo.at(-1)?.final ?? saldoIni;
@@ -35,7 +36,7 @@ export function RelatorioPainel({ contas, periodo, corte, linhas, saldoIni, real
     { t: temProj ? "Saldo projetado" : "Saldo final", v: final, d: fim && fmtData(fim), destaque: true },
   ];
   return <article className="treasury-report bg-card text-card-foreground">
-    <div className="mb-4 flex justify-end print:hidden"><Button variant="outline" size="sm" disabled={!periodo.length} onClick={() => void baixarExcelForecast(linhas, periodo, abertos, { titulo: "Demonstrativo gerencial · Forecast", subtitulo: `Período ${inicio ? fmtData(inicio) : ""} a ${fim ? fmtData(fim) : ""} · realizado até ${fmtData(corte)} · ${contas.length} contas bancárias`, corte, kpis: kpis.map((k) => ({ t: k.t, v: k.v })), arquivo: `relatorio-gerencial-${inicio ?? ""}-a-${fim ?? ""}.xlsx` })}><FileSpreadsheet /> Baixar Excel</Button></div>
+    <div className="mb-4 flex justify-end print:hidden"><Button variant="outline" size="sm" disabled={!periodo.length} onClick={() => void baixarExcelForecast(linhas, periodo, abertos, { titulo: "Demonstrativo gerencial · Forecast", subtitulo: `Período ${inicio ? fmtData(inicio) : ""} a ${fim ? fmtData(fim) : ""} · realizado até ${fmtData(corte)} · ${contas.length} contas bancárias`, corte, kpis: kpis.map((k) => ({ t: k.t, v: k.v })), movimentacoes, arquivo: `relatorio-gerencial-${inicio ?? ""}-a-${fim ?? ""}.xlsx` })}><FileSpreadsheet /> Baixar Excel</Button></div>
     <header className="flex flex-wrap items-start justify-between gap-5 border-b-2 border-primary pb-7">
       <div><div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary"><Landmark className="size-4" /> Financeiro SVD SEMINOVOS · Grupo SVD</div><h2 className="text-3xl font-semibold leading-tight">Demonstrativo gerencial · Forecast</h2><p className="mt-2 text-sm text-muted-foreground">Realizado e projeção por plano financeiro</p></div>
       <div className="sm:text-right"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Período</p><p className="num mt-1 text-lg font-semibold">{inicio && fim ? `${fmtData(inicio)} a ${fmtData(fim)}` : "—"}</p><p className="mt-2 text-xs text-muted-foreground">Realizado até {fmtData(corte)} · {contas.length} contas bancárias</p></div>
@@ -63,6 +64,11 @@ export function RelatorioPainel({ contas, periodo, corte, linhas, saldoIni, real
         return <TableRow key={e.id}><TableCell><p className="font-semibold">{e.banco}</p><p className="text-xs text-muted-foreground">Ag {e.agencia || "—"} · CC {e.conta || "—"}</p></TableCell><TableCell className="num text-right">{fmt(a)}</TableCell><TableCell className={`num text-right font-semibold ${b < 0 ? "text-debit" : ""}`}>{fmt(b)}</TableCell><TableCell className="text-xs text-muted-foreground">Extrato até {u.data ? fmtData(u.data) : "—"}{u.parcial ? " · parcial" : ""}</TableCell></TableRow>;
       })}</TableBody></Table>
     </section>
+    {movimentacoes.length > 0 && (
+      <section className="report-section mt-7"><Titulo numero="05" titulo="Movimentações" />
+        <MovimentacoesRelatorio movimentacoes={movimentacoes} />
+      </section>
+    )}
     <footer className="mt-10 flex flex-wrap justify-between gap-2 border-t pt-4 text-xs text-muted-foreground"><span>Financeiro SVD SEMINOVOS · Grupo SVD · Para apreciação da diretoria</span><span>Emitido em {new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} · horário de Brasília</span></footer>
   </article>;
 }
