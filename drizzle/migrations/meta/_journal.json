@@ -134,6 +134,13 @@
       "when": 1795696822994,
       "tag": "0018_create_patrimonio_config",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795723760058,
+      "tag": "0019_equipe_sobrepor_previsoes_realizados",
+      "breakpoints": true
     }
   ]
 }
