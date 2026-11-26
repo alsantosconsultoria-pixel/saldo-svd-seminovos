@@ -311,7 +311,7 @@ const valorLinha = (s: SnapshotPatrimonio, id: LinhaComparacaoPatrimonio["id"]) 
   if (id.startsWith("grupo-")) return 0;
   const valor = s[id as keyof SnapshotPatrimonio];
   if (typeof valor !== "number") return 0;
-  return id === "pdd" || id === "depreciacao" ? -valor : valor;
+  return id === "pdd" || id === "depreciacao" ? (valor === 0 ? 0 : -valor) : valor;
 };
 
 export function compararPatrimonio(a: SnapshotPatrimonio, b: SnapshotPatrimonio): LinhaComparacaoPatrimonio[] {

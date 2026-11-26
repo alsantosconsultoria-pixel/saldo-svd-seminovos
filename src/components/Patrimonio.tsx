@@ -188,7 +188,7 @@ export function Patrimonio({ lista, realizados, previsoes, versao = 0 }: { lista
   const descricaoA = CENARIOS.find((c) => c.id === cenarioA)?.descricao;
   const descricaoB = CENARIOS.find((c) => c.id === cenarioB)?.descricao;
 
-  return <div className="space-y-5">
+  return <div className="min-w-0 max-w-full space-y-5 overflow-x-hidden">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground"><Landmark className="size-4" /> Financeiro SVD SEMINOVOS</div><h2 className="text-2xl font-semibold">Análise de Patrimônio</h2><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Leitura executiva da posição gerencial, construída com extratos, realizado e previsões. Saldos contábeis não disponíveis permanecem identificados, sem estimativas automáticas.</p></div>
       <Badge variant={Math.abs(snapB.diferenca) < 0.01 ? "outline" : "destructive"} className="gap-1.5 px-3 py-1.5"><Scale className="size-3.5" />{Math.abs(snapB.diferenca) < 0.01 ? "Partida dobrada validada" : `Diferença de ${fmt(snapB.diferenca)}`}</Badge>
@@ -224,9 +224,9 @@ export function Patrimonio({ lista, realizados, previsoes, versao = 0 }: { lista
 
     <Card className="p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Indicadores patrimoniais</h3><p className="text-xs text-muted-foreground">{nomeCenario(cenarioB)} · variação em relação a {nomeCenario(cenarioA)}</p></div><span className="text-xs text-muted-foreground">ROE e ROA usam os saldos finais do período</span></div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{cards.map((c) => {
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{cards.map((c) => {
         const delta = c.a === null || c.b === null ? null : c.b - c.a;
-        return <div key={c.id} className="rounded-md border bg-muted/20 p-3"><p className="min-h-8 text-xs text-muted-foreground">{c.titulo}</p><p className={`num mt-1 text-lg font-semibold ${(c.b ?? 0) < 0 ? "text-debit" : ""}`}>{formatarCard(c.b, c.tipo)}</p><p className="mt-1 text-[11px] text-muted-foreground">{delta === null ? "Sem base de comparação" : `${delta >= 0 ? "+" : ""}${formatarCard(delta, c.tipo)} vs. A`}</p></div>;
+        return <div key={c.id} className="min-w-0 rounded-md border bg-muted/20 p-3"><p className="text-xs text-muted-foreground">{c.titulo}</p><p className={`num mt-1 truncate text-base font-semibold ${(c.b ?? 0) < 0 ? "text-debit" : ""}`} title={formatarCard(c.b, c.tipo)}>{formatarCard(c.b, c.tipo)}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{delta === null ? "Sem base de comparação" : `${delta >= 0 ? "+" : ""}${formatarCard(delta, c.tipo)} vs. A`}</p></div>;
       })}</div>
     </Card>
 

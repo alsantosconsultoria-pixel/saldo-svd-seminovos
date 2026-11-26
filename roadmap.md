@@ -51,7 +51,7 @@
 - [x] Conferir na tela com conta conectada: contagens por grupo, botões habilitados e trava do "Apagar tudo".
 
 # Análise de Patrimônio
-- [ ] Criar aba com visões diária e mensal, filtros e comparação entre cenários e períodos.
-- [ ] Calcular posição gerencial com dados reais de extratos, realizado e previsões, sem inventar saldos contábeis ausentes.
-- [ ] Adicionar premissas interativas, alertas de oscilação, indicadores, gráfico e parecer técnico.
-- [ ] Testar cálculos e conferir a nova área na tela.
+- [x] Criar aba com visões diária e mensal, filtros e comparação entre cenários e períodos.
+- [x] Calcular posição gerencial com dados reais de extratos, realizado e previsões, sem inventar saldos contábeis ausentes.
+- [x] Adicionar premissas interativas, alertas de oscilação, indicadores, gráfico e parecer técnico.
+- [x] Testar cálculos e conferir a nova área na tela.
