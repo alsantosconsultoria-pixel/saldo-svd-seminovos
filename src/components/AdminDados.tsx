@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import { Database, RotateCcw, Trash2 } from "lucide-react";
+import { CalendarRange, Database, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { KEY as CHAVE_EXTRATOS } from "@/lib/extrato/store";
-import { contarDados, limparDados, type Grupo } from "@/lib/admin.functions";
+import { fmtData, KEY as CHAVE_EXTRATOS } from "@/lib/extrato/store";
+import {
+  contarDados,
+  contarDadosPeriodo,
+  limparDados,
+  limparDadosPeriodo,
+  type Grupo,
+  type GrupoPeriodo,
+} from "@/lib/admin.functions";
 
 const ROTULOS: Record<Grupo, string> = {
   extratos: "Extratos importados",
@@ -15,15 +22,26 @@ const ROTULOS: Record<Grupo, string> = {
   demonstrativos: "Aprovações da diretoria",
 };
 const ORDEM: Grupo[] = ["extratos", "previsoes", "realizados", "transferencias", "demonstrativos"];
+const ORDEM_PERIODO: GrupoPeriodo[] = ["extratos", "previsoes", "realizados"];
 const msg = (e: unknown) => (e instanceof Error ? e.message : "Não foi possível concluir.");
 
 export function AdminDados() {
   const [totais, setTotais] = useState<Record<string, number>>({});
   const [texto, setTexto] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
+  const [totaisPeriodo, setTotaisPeriodo] = useState<Record<GrupoPeriodo, number> | null>(null);
 
   const carregar = useCallback(() => contarDados().then(setTotais).catch((e) => toast.error(msg(e))), []);
   useEffect(() => { carregar(); }, [carregar]);
+
+  const periodoValido = Boolean(de && ate && de <= ate);
+  const carregarPeriodo = useCallback(() => {
+    if (!de || !ate || de > ate) { setTotaisPeriodo(null); return; }
+    contarDadosPeriodo({ data: { de, ate } }).then(setTotaisPeriodo).catch((e) => toast.error(msg(e)));
+  }, [de, ate]);
+  useEffect(() => { carregarPeriodo(); }, [carregarPeriodo]);
 
   async function apagar(grupos: Grupo[], aviso: string) {
     if (!confirm(aviso)) return;
@@ -41,6 +59,25 @@ export function AdminDados() {
       carregar();
     }
   }
+
+  async function apagarPeriodo(grupos: GrupoPeriodo[], aviso: string) {
+    if (!periodoValido || !confirm(aviso)) return;
+    setOcupado(true);
+    try {
+      const { apagados } = await limparDadosPeriodo({ data: { grupos, de, ate } });
+      const n = Object.values(apagados).reduce((a, b) => a + b, 0);
+      if (grupos.includes("extratos")) localStorage.removeItem(CHAVE_EXTRATOS);
+      toast.success(`${n} registro(s) do período apagado(s). Recarregando...`);
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      toast.error(msg(e));
+      setOcupado(false);
+      carregar();
+      carregarPeriodo();
+    }
+  }
+
+  const totalNoPeriodo = totaisPeriodo ? ORDEM_PERIODO.reduce((s, g) => s + totaisPeriodo[g], 0) : 0;
 
   return (
     <Card className="p-5">
@@ -66,6 +103,67 @@ export function AdminDados() {
           </li>
         ))}
       </ul>
+      <div className="mt-5 border-t pt-4">
+        <h4 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+          <CalendarRange className="size-4" /> Limpar por período
+        </h4>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Remove apenas os lançamentos dentro da faixa selecionada, mantendo intactos os dados fora dela.
+        </p>
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          <label className="text-xs text-muted-foreground">
+            De
+            <Input type="date" className="mt-1 w-40" value={de} onChange={(e) => setDe(e.target.value)} />
+          </label>
+          <label className="text-xs text-muted-foreground">
+            Até
+            <Input type="date" className="mt-1 w-40" value={ate} onChange={(e) => setAte(e.target.value)} />
+          </label>
+          {de && ate && de > ate && (
+            <span className="text-xs text-destructive">A data inicial deve ser menor ou igual à final.</span>
+          )}
+        </div>
+        <ul className="space-y-2">
+          {ORDEM_PERIODO.map((g) => (
+            <li key={g} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2.5">
+              <span className="text-sm">
+                {ROTULOS[g]}
+                <span className="num ml-2 text-xs text-muted-foreground">
+                  {totaisPeriodo ? `${totaisPeriodo[g]} no período` : "selecione o período"}
+                </span>
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={ocupado || !periodoValido || !totaisPeriodo?.[g]}
+                onClick={() =>
+                  apagarPeriodo(
+                    [g],
+                    `Apagar ${ROTULOS[g].toLowerCase()} de ${fmtData(de)} a ${fmtData(ate)}? Dados fora dessa faixa serão mantidos.`,
+                  )
+                }
+              >
+                <Trash2 /> Apagar período
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3">
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={ocupado || !periodoValido || totalNoPeriodo === 0}
+            onClick={() =>
+              apagarPeriodo(
+                ORDEM_PERIODO,
+                `Apagar extratos, previsões e realizados de ${fmtData(de)} a ${fmtData(ate)}? Dados fora dessa faixa serão mantidos.`,
+              )
+            }
+          >
+            <Trash2 /> Apagar os 3 no período
+          </Button>
+        </div>
+      </div>
       <div className="mt-5 border-t pt-4">
         <h4 className="text-sm font-semibold">Limpar tudo</h4>
         <p className="mb-2 text-xs text-muted-foreground">Digite LIMPAR para confirmar.</p>

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Extrato } from "@/lib/extrato/parser";
 
 type Ctx = { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: "admin" | "user" }) => PromiseLike<{ data: boolean | null }> }; userId: string };
 
@@ -76,6 +77,11 @@ export const removerUsuario = createServerFn({ method: "POST" })
 // ===== Limpeza de dados (somente administradores) =====
 export const GRUPOS = ["extratos", "previsoes", "realizados", "transferencias", "demonstrativos"] as const;
 export type Grupo = (typeof GRUPOS)[number];
+export const GRUPOS_PERIODO = ["extratos", "previsoes", "realizados"] as const;
+export type GrupoPeriodo = (typeof GRUPOS_PERIODO)[number];
+
+const RE_ISO = /^\d{4}-\d{2}-\d{2}$/;
+const noPeriodo = (data: string, de: string, ate: string) => data >= de && data <= ate;
 
 // aceita apenas grupos conhecidos; nada conhecido = nada a apagar
 export function validarGrupos(d: { grupos?: unknown }): { grupos: Grupo[] } {
@@ -83,6 +89,44 @@ export function validarGrupos(d: { grupos?: unknown }): { grupos: Grupo[] } {
   const grupos = bruto.filter((g): g is Grupo => (GRUPOS as readonly string[]).includes(g as Grupo));
   if (!grupos.length) throw new Error("Escolha o que deseja apagar.");
   return { grupos };
+}
+
+export function validarFaixa(d: { de?: unknown; ate?: unknown }): { de: string; ate: string } {
+  const de = String(d?.de ?? "").trim();
+  const ate = String(d?.ate ?? "").trim();
+  if (!RE_ISO.test(de) || !RE_ISO.test(ate)) throw new Error("Informe a data inicial e a data final.");
+  if (de > ate) throw new Error("A data inicial não pode ser maior que a data final.");
+  return { de, ate };
+}
+
+export function validarPeriodo(d: { grupos?: unknown; de?: unknown; ate?: unknown }): { grupos: GrupoPeriodo[]; de: string; ate: string } {
+  const { de, ate } = validarFaixa(d);
+  const bruto = Array.isArray(d?.grupos) ? d.grupos : [];
+  const grupos = bruto.filter((g): g is GrupoPeriodo => (GRUPOS_PERIODO as readonly string[]).includes(g as GrupoPeriodo));
+  if (!grupos.length) throw new Error("Escolha o que deseja apagar.");
+  return { grupos, de, ate };
+}
+
+// remove apenas transações, saldos e futuros dentro do período [de, ate]
+export function recortarExtratoPeriodo(e: Extrato, de: string, ate: string): { extrato: Extrato | null; removidos: number } {
+  const transacoes = e.transacoes.filter((t) => !noPeriodo(t.data, de, ate));
+  const saldosInformados = e.saldosInformados.filter((s) => !noPeriodo(s.data, de, ate));
+  const futurosOrig = e.futuros ?? [];
+  const futuros = futurosOrig.filter((f) => !noPeriodo(f.data, de, ate));
+  const removidos =
+    (e.transacoes.length - transacoes.length) +
+    (e.saldosInformados.length - saldosInformados.length) +
+    (futurosOrig.length - futuros.length);
+  if (removidos === 0) return { extrato: e, removidos: 0 };
+  if (!transacoes.length && !saldosInformados.length && !futuros.length) return { extrato: null, removidos };
+  const atualizado: Extrato = {
+    ...e,
+    transacoes,
+    saldosInformados,
+    saldoFinalInformado: saldosInformados.at(-1)?.saldo ?? null,
+    ...(e.futuros ? { futuros } : {}),
+  };
+  return { extrato: atualizado, removidos };
 }
 
 export const contarDados = createServerFn({ method: "GET" })
@@ -110,6 +154,61 @@ export const limparDados = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin.from(g).delete().not("id", "is", null);
       if (error) throw new Error(`Não foi possível apagar os dados de ${g}.`);
       apagados[g] = count ?? 0;
+    }
+    return { apagados };
+  });
+
+export const contarDadosPeriodo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validarFaixa)
+  .handler(async ({ context, data: { de, ate } }) => {
+    await exigirAdmin(context as unknown as Ctx);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [real, prev, ext] = await Promise.all([
+      supabaseAdmin.from("realizados").select("id", { count: "exact", head: true }).gte("data", de).lte("data", ate),
+      supabaseAdmin.from("previsoes").select("id", { count: "exact", head: true }).gte("vencimento", de).lte("vencimento", ate),
+      supabaseAdmin.from("extratos").select("id, dados"),
+    ]);
+    const extCount = (ext.data ?? []).reduce(
+      (acc, r) => acc + recortarExtratoPeriodo(r.dados as unknown as Extrato, de, ate).removidos,
+      0,
+    );
+    return { extratos: extCount, previsoes: prev.count ?? 0, realizados: real.count ?? 0 } satisfies Record<GrupoPeriodo, number>;
+  });
+
+export const limparDadosPeriodo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validarPeriodo)
+  .handler(async ({ context, data: { grupos, de, ate } }) => {
+    await exigirAdmin(context as unknown as Ctx);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const apagados: Record<string, number> = {};
+    for (const g of grupos) {
+      if (g === "realizados") {
+        const { count } = await supabaseAdmin.from("realizados").select("id", { count: "exact", head: true }).gte("data", de).lte("data", ate);
+        const { error } = await supabaseAdmin.from("realizados").delete().gte("data", de).lte("data", ate);
+        if (error) throw new Error("Não foi possível apagar os realizados do período.");
+        apagados[g] = count ?? 0;
+      } else if (g === "previsoes") {
+        const { count } = await supabaseAdmin.from("previsoes").select("id", { count: "exact", head: true }).gte("vencimento", de).lte("vencimento", ate);
+        const { error } = await supabaseAdmin.from("previsoes").delete().gte("vencimento", de).lte("vencimento", ate);
+        if (error) throw new Error("Não foi possível apagar as previsões do período.");
+        apagados[g] = count ?? 0;
+      } else if (g === "extratos") {
+        const { data: rows, error: errSel } = await supabaseAdmin.from("extratos").select("id, dados");
+        if (errSel) throw new Error("Não foi possível ler os extratos.");
+        let total = 0;
+        for (const r of rows ?? []) {
+          const { extrato, removidos } = recortarExtratoPeriodo(r.dados as unknown as Extrato, de, ate);
+          if (!removidos) continue;
+          const { error } = extrato
+            ? await supabaseAdmin.from("extratos").update({ dados: JSON.parse(JSON.stringify(extrato)), atualizado_em: new Date().toISOString() }).eq("id", r.id)
+            : await supabaseAdmin.from("extratos").delete().eq("id", r.id);
+          if (error) throw new Error("Não foi possível atualizar os extratos do período.");
+          total += removidos;
+        }
+        apagados[g] = total;
+      }
     }
     return { apagados };
   });
