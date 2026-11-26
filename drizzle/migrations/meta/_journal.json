@@ -127,6 +127,13 @@
       "when": 1794658229711,
       "tag": "0017_permissoes_usuario",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795696822994,
+      "tag": "0018_create_patrimonio_config",
+      "breakpoints": true
     }
   ]
 }

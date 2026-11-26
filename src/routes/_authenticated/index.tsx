@@ -21,6 +21,7 @@ import { SaldoDiario } from "@/components/SaldoDiario";
 import { TabelaLancamentos } from "@/components/TabelaLancamentos";
 import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
+import { Patrimonio } from "@/components/Patrimonio";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
 import { ResumoPlano } from "@/components/ResumoPlano";
 import { aplicarProgramacao, ehTransferenciaFinanceira, type MovimentacaoFluxo, type Programacao, fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
@@ -168,14 +169,14 @@ function Index() {
   const [planoContas, setPlanoContas] = useState<ContaPlano[]>([]);
   const [planoMapa, setPlanoMapa] = useState<Record<string, string>>({});
   const [programas, setProgramas] = useState<Programacao[]>([]);
-  const [prevs, setPrevs] = useState<{ id: string; tipo: string; vencimento: string; categoria: string; valor: number; banco: string; contraparte: string }[]>([]);
+  const [prevs, setPrevs] = useState<{ id: string; tipo: "pagar" | "receber"; vencimento: string; categoria: string; valor: number; banco: string; contraparte: string; documento: string }[]>([]);
   useEffect(() => {
     const ler = async () => {
-      const [c, m, p, sel] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("id,tipo,vencimento,categoria,valor,banco,contraparte"), supabase.from("tratativa_selecao").select("dia,desmarcados,incluidos,manuais")]);
+      const [c, m, p, sel] = await Promise.all([supabase.from("plano_contas").select("*"), supabase.from("plano_categorias").select("*"), supabase.from("previsoes").select("id,tipo,vencimento,categoria,valor,banco,contraparte,documento"), supabase.from("tratativa_selecao").select("dia,desmarcados,incluidos,manuais")]);
       setProgramas((sel.data ?? []).map((g) => ({ dia: g.dia, desmarcados: g.desmarcados ?? [], incluidos: g.incluidos ?? [], manuais: (g.manuais as unknown as Programacao["manuais"]) ?? [] })));
       setPlanoContas((c.data ?? []) as ContaPlano[]);
       setPlanoMapa(Object.fromEntries((m.data ?? []).map((x) => [x.categoria, x.conta_id])));
-      setPrevs((p.data ?? []).map((x) => ({ ...x, valor: Number(x.valor), vencimento: proximoDiaUtil(x.vencimento), banco: x.banco ?? "", contraparte: x.contraparte ?? "" })));
+      setPrevs((p.data ?? []).map((x) => ({ ...x, tipo: x.tipo === "receber" ? "receber" as const : "pagar" as const, valor: Number(x.valor), vencimento: proximoDiaUtil(x.vencimento), banco: x.banco ?? "", contraparte: x.contraparte ?? "", documento: x.documento ?? "" })));
     };
     ler();
     const ch = supabase.channel("painel-plano").on("postgres_changes", { event: "*", schema: "public", table: "previsoes" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_categorias" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "tratativa_selecao" }, ler).on("postgres_changes", { event: "*", schema: "public", table: "plano_contas" }, ler).subscribe();
@@ -390,6 +391,7 @@ function Index() {
               {podeAba("contas") && <TabsTrigger value="contas">Contas</TabsTrigger>}
               {podeAba("tratativas") && <TabsTrigger value="tratativas">Tratativas do dia</TabsTrigger>}
               {podeAba("previsoes") && <TabsTrigger value="previsoes">Fluxo</TabsTrigger>}
+              {podeAba("patrimonio") && <TabsTrigger value="patrimonio">Patrimônio</TabsTrigger>}
               {admin && <TabsTrigger value="admin">Administração</TabsTrigger>}
             </TabsList>
           </div>
@@ -397,6 +399,7 @@ function Index() {
           <TabsContent value="tratativas"><Tratativas key={versaoDados} lista={lista} /></TabsContent>
           {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminPermissoes /><AdminPlano /><AdminDados /></TabsContent>}
           <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} realizados={realizados} /></TabsContent>
+          <TabsContent value="patrimonio"><Patrimonio lista={ativos} realizados={realizados} previsoes={prevs} versao={versaoDados} /></TabsContent>
 
           <TabsContent value="painel" className={`space-y-4 ${relatorioPainel ? "dashboard-presentation" : ""}`}>
             <div className="dashboard-controls flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">

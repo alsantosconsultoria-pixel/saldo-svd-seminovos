@@ -49,3 +49,9 @@
 - [x] Botão de limpar dados de volta, dentro da aba Administração, grupo a grupo e com "Limpar tudo" confirmado por digitação.
 - [x] Testar a seleção do que pode ser apagado (grupos conhecidos, nada escolhido).
 - [x] Conferir na tela com conta conectada: contagens por grupo, botões habilitados e trava do "Apagar tudo".
+
+# Análise de Patrimônio
+- [ ] Criar aba com visões diária e mensal, filtros e comparação entre cenários e períodos.
+- [ ] Calcular posição gerencial com dados reais de extratos, realizado e previsões, sem inventar saldos contábeis ausentes.
+- [ ] Adicionar premissas interativas, alertas de oscilação, indicadores, gráfico e parecer técnico.
+- [ ] Testar cálculos e conferir a nova área na tela.

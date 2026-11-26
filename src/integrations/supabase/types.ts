@@ -77,6 +77,27 @@ export type Database = {
         }
         Relationships: []
       }
+      patrimonio_config: {
+        Row: {
+          atualizado_em: string
+          dados: Json
+          id: string
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          dados?: Json
+          id: string
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          dados?: Json
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       permissoes_usuario: {
         Row: {
           abas: string[]

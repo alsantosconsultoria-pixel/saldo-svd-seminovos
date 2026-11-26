@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const ABAS = [
   { id: "painel", nome: "Painel" }, { id: "diario", nome: "Saldo diário" }, { id: "lanc", nome: "Lançamentos" },
   { id: "contas", nome: "Contas" }, { id: "tratativas", nome: "Tratativas do dia" }, { id: "previsoes", nome: "Fluxo" },
+  { id: "patrimonio", nome: "Patrimônio" },
 ] as const;
 export const IMPORTACOES = [
   { id: "extrato", nome: "Extrato PDF" }, { id: "previsoes", nome: "Previsões" }, { id: "realizado", nome: "Realizado" },
