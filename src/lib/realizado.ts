@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import type { Extrato, Transacao } from "@/lib/extrato/parser";
-import { data, norm, pega, pegaMarcador, valor } from "@/lib/importar-previsoes";
+import { data, faixaDatas, norm, pega, pegaMarcador, valor } from "@/lib/importar-previsoes";
 import { ehTransferenciaFinanceira } from "@/lib/plano";
 
 export interface Realizado {
@@ -80,7 +80,14 @@ export function realizadoPorDia(realizados: (Pick<Realizado, "data" | "tipo" | "
   return [...m.values()].sort((a, b) => a.data.localeCompare(b.data));
 }
 
-export async function importarRealizado(f: File): Promise<{ novos: number; lidos: number }> {
+export interface ResultadoImportacaoRealizado {
+  lidos: number;
+  previsoesRemovidas: number;
+  de: string;
+  ate: string;
+}
+
+export async function importarRealizado(f: File): Promise<ResultadoImportacaoRealizado> {
   const wb = /\.csv$/i.test(f.name) ? XLSX.read(await f.text(), { type: "string", raw: true }) : XLSX.read(await f.arrayBuffer(), { cellDates: true });
   const folha = wb.Sheets[wb.SheetNames[0] ?? ""];
   if (!folha) throw new Error("A planilha não tem uma aba para leitura.");
@@ -89,14 +96,32 @@ export async function importarRealizado(f: File): Promise<{ novos: number; lidos
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Entre novamente para importar a planilha.");
   const unicas = [...new Map(linhas.map((l) => [l.chave, l])).values()];
-  let novos = 0;
+  const faixa = faixaDatas(unicas.map((l) => l.data))!;
+
+  // Sobrepõe o período do realizado sem duplicar lançamentos.
+  const { error: errDel } = await supabase.from("realizados").delete().gte("data", faixa.de).lte("data", faixa.ate);
+  if (errDel) throw new Error("Não foi possível substituir o realizado do período. Tente novamente.");
+
   for (let i = 0; i < unicas.length; i += 500) {
-    const { data: ins, error } = await supabase.from("realizados")
-      .upsert(unicas.slice(i, i + 500).map((l) => ({ ...l, user_id: u.user!.id, arquivo: f.name })), { onConflict: "chave" }).select("id");
+    const { error } = await supabase.from("realizados")
+      .insert(unicas.slice(i, i + 500).map((l) => ({ ...l, user_id: u.user!.id, arquivo: f.name })));
     if (error) throw new Error("Não foi possível salvar o realizado. Tente novamente.");
-    novos += ins?.length ?? 0;
   }
-  return { novos, lidos: unicas.length };
+
+  // Dias trazidos como realizados deixam de constar como previstos.
+  const datasRealizadas = [...new Set(unicas.map((l) => l.data))];
+  let previsoesRemovidas = 0;
+  for (let i = 0; i < datasRealizadas.length; i += 200) {
+    const { data: rem, error: errPrev } = await supabase
+      .from("previsoes")
+      .delete()
+      .in("vencimento", datasRealizadas.slice(i, i + 200))
+      .select("id");
+    if (errPrev) throw new Error("Realizado salvo, mas não foi possível remover as previsões dos dias realizados.");
+    previsoesRemovidas += rem?.length ?? 0;
+  }
+
+  return { lidos: unicas.length, previsoesRemovidas, de: faixa.de, ate: faixa.ate };
 }
 
 export async function carregarRealizados(): Promise<Realizado[]> {

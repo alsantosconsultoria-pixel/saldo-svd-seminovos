@@ -30,7 +30,26 @@ export function valor(v: unknown): number {
   return (neg ? -n : n) || 0;
 }
 
-export async function importarPrevisoes(f: File): Promise<number> {
+export function faixaDatas(datas: string[]): { de: string; ate: string } | null {
+  if (!datas.length) return null;
+  const ord = [...datas].sort();
+  return { de: ord[0]!, ate: ord[ord.length - 1]! };
+}
+
+export function filtrarPrevisoesSemRealizado<T extends { vencimento: string }>(itens: T[], datasRealizadas: Iterable<string>): { manter: T[]; removidos: number } {
+  const realizadas = new Set(datasRealizadas);
+  const manter = itens.filter((i) => !realizadas.has(i.vencimento));
+  return { manter, removidos: itens.length - manter.length };
+}
+
+export interface ResultadoImportacaoPrevisoes {
+  importados: number;
+  ignoradosRealizado: number;
+  de: string;
+  ate: string;
+}
+
+export async function importarPrevisoes(f: File): Promise<ResultadoImportacaoPrevisoes> {
   const wb = /\.csv$/i.test(f.name)
     ? XLSX.read(await f.text(), { type: "string", raw: true })
     : XLSX.read(await f.arrayBuffer(), { cellDates: true });
@@ -58,7 +77,35 @@ export async function importarPrevisoes(f: File): Promise<number> {
     }];
   });
   if (!novos.length) throw new Error("Nenhuma linha válida. Confira as colunas Data vencimento e Valor título.");
-  const { error } = await supabase.from("previsoes").insert(novos);
-  if (error) throw new Error("Não foi possível salvar as previsões. Tente novamente.");
-  return novos.length;
+  const faixa = faixaDatas(novos.map((n) => n.vencimento))!;
+
+  // Dias que já possuem realizado deixam de ser previstos.
+  const datasRealizadas = new Set<string>();
+  for (let i = 0; ; i += 1000) {
+    const { data: real, error: errReal } = await supabase
+      .from("realizados")
+      .select("data")
+      .gte("data", faixa.de)
+      .lte("data", faixa.ate)
+      .range(i, i + 999);
+    if (errReal) throw new Error("Não foi possível verificar os dias já realizados. Tente novamente.");
+    for (const r of real ?? []) if (r.data) datasRealizadas.add(r.data);
+    if (!real || real.length < 1000) break;
+  }
+
+  const { manter, removidos } = filtrarPrevisoesSemRealizado(novos, datasRealizadas);
+
+  // Sobrepõe o período da planilha sem duplicar lançamentos.
+  const { error: errDel } = await supabase
+    .from("previsoes")
+    .delete()
+    .gte("vencimento", faixa.de)
+    .lte("vencimento", faixa.ate);
+  if (errDel) throw new Error("Não foi possível substituir as previsões do período. Tente novamente.");
+
+  for (let i = 0; i < manter.length; i += 500) {
+    const { error } = await supabase.from("previsoes").insert(manter.slice(i, i + 500));
+    if (error) throw new Error("Não foi possível salvar as previsões. Tente novamente.");
+  }
+  return { importados: manter.length, ignoradosRealizado: removidos, de: faixa.de, ate: faixa.ate };
 }

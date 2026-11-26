@@ -84,8 +84,10 @@ function Index() {
     const aviso = toast.loading(`Lendo realizado de ${f.name}...`);
     try {
       const r = await importarRealizado(f);
-      toast.success(`${r.lidos} lançamentos realizados lidos, ${r.novos} novos (repetidos ignorados).`, { id: aviso });
+      const extra = r.previsoesRemovidas > 0 ? ` ${r.previsoesRemovidas} previsões desses dias foram removidas.` : "";
+      toast.success(`${r.lidos} lançamentos realizados substituídos no período (${fmtData(r.de)} a ${fmtData(r.ate)}).${extra}`, { id: aviso });
       recarregarRealizados();
+      setAtualizacaoPrevisoes((v) => v + 1);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível ler a planilha.", { id: aviso }); }
   }
   const [relatorioPainel, setRelatorioPainel] = useState(false);
@@ -268,8 +270,9 @@ function Index() {
       for (const arquivo of planilhas) {
         const aviso = toast.loading(`Lendo ${arquivo.name}...`);
         try {
-          const total = await importarPrevisoes(arquivo);
-          toast.success(`${total} previsões importadas.`, { id: aviso });
+          const r = await importarPrevisoes(arquivo);
+          const ign = r.ignoradosRealizado > 0 ? ` ${r.ignoradosRealizado} de dias já realizados foram ignoradas.` : "";
+          toast.success(`${r.importados} previsões importadas no período (${fmtData(r.de)} a ${fmtData(r.ate)}).${ign}`, { id: aviso });
           setAtualizacaoPrevisoes((v) => v + 1);
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "Não foi possível ler a planilha.", { id: aviso });
