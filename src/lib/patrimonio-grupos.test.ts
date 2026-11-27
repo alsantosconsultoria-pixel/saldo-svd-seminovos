@@ -33,4 +33,18 @@ describe('Agrupamentos do Patrimônio',()=> {
     const m=matrizPatrimonio({...base,realizados:[r('2026-11-01',350000,'MOVIMENTAÇÃO - TRANSFERÊNCIA FINANCEIRA - SAIDA')]});
     expect(m.total.total).toBe(0);
   });
+  it('agrupa planos de mesmo nome com categorias associadas e lançamentos individuais',()=> {
+    const m=matrizPatrimonio({
+      ...base,
+      grupos:[{id:'f',nome:'Fornecedores',planos:['p1','p2']}],
+      planos:[{id:'p1',nome:'DESPESAS ADMINISTRATIVAS'},{id:'p2',nome:'DESPESAS ADMINISTRATIVAS'}],
+      categorias:{Energia:'p1',Aluguel:'p2',Telefone:'p2'},
+      realizados:[r('2026-11-01',120,'Energia'),r('2026-11-02',300,'Aluguel')],
+    });
+    const plano = m.linhas[0]?.filhos[0];
+    expect(plano?.nome).toBe('DESPESAS ADMINISTRATIVAS');
+    expect(plano?.filhos.map(c=>c.nome)).toEqual(['Aluguel','Energia','Telefone']);
+    expect(plano?.filhos.find(c=>c.nome==='Energia')?.itens).toHaveLength(1);
+    expect(plano?.filhos.find(c=>c.nome==='Telefone')?.itens).toEqual([]);
+  });
 });

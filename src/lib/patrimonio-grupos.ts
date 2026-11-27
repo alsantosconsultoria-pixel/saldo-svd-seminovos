@@ -2,7 +2,29 @@ import { ehTransferenciaFinanceira } from './plano';
 import type { Realizado } from './realizado';
 import type { TituloPatrimonio, GranularidadePatrimonio } from './patrimonio';
 export interface GrupoPatrimonio { id: string; nome: string; planos: string[] }
-export interface LinhaPatrimonio { id: string; nome: string; valores: number[]; variacao: number; percentual: number | null; total: number; filhos: LinhaPatrimonio[] }
+export interface ItemPatrimonio {
+  id: string;
+  data: string;
+  origem: 'realizado' | 'previsao';
+  tipo: 'pagar' | 'receber';
+  categoria: string;
+  contraparte: string;
+  descricao: string;
+  documento: string;
+  conta: string;
+  valor: number;
+}
+export interface LinhaPatrimonio {
+  id: string;
+  nome: string;
+  nivel: 'grupo' | 'plano' | 'categoria' | 'total';
+  valores: number[];
+  variacao: number;
+  percentual: number | null;
+  total: number;
+  filhos: LinhaPatrimonio[];
+  itens?: ItemPatrimonio[];
+}
 export function associarPlanoPatrimonio(grupos: GrupoPatrimonio[], plano: string, destino: string): GrupoPatrimonio[] {
   return grupos.map(g => ({ ...g, planos: [...g.planos.filter(p => p !== plano), ...(g.id === destino ? [plano] : [])] }));
 }
@@ -10,30 +32,64 @@ export function matrizPatrimonio(args: { grupos: GrupoPatrimonio[]; planos: {id:
   const { grupos, planos, categorias, realizados, previsoes, datas, de, granularidade } = args;
   const indice = new Map(datas.map((d,i) => [granularidade === 'mensal' ? d.slice(0,7) : d, i]));
   const baixas = new Set(realizados.map(r => r.data));
-  const itens = [...realizados.map(r => ({ data:r.data, categoria:r.categoria, tipo:r.tipo, valor:r.valor })), ...previsoes.filter(p => !baixas.has(p.vencimento)).map(p => ({data:p.vencimento, categoria:p.categoria ?? '', tipo:p.tipo, valor:p.valor}))];
-  const valores = new Map<string, number[]>();
-  for (const p of planos) valores.set(p.id, datas.map(() => 0));
+  const itens: ItemPatrimonio[] = [
+    ...realizados.map(r => ({ id: r.id, data: r.data, origem: 'realizado' as const, tipo: r.tipo, categoria: r.categoria, contraparte: r.contraparte, descricao: r.descricao, documento: r.documento, conta: r.conta, valor: r.valor })),
+    ...previsoes.filter(p => !baixas.has(p.vencimento)).map(p => ({ id: p.id, data: p.vencimento, origem: 'previsao' as const, tipo: p.tipo, categoria: p.categoria ?? '', contraparte: p.contraparte ?? '', descricao: '', documento: p.documento ?? '', conta: '', valor: p.valor })),
+  ];
+  const porPlanoCat = new Map<string, Map<string, { valores: number[]; itens: ItemPatrimonio[] }>>();
+  const garantirCat = (planoId: string, cat: string) => {
+    let mapa = porPlanoCat.get(planoId);
+    if (!mapa) { mapa = new Map(); porPlanoCat.set(planoId, mapa); }
+    let reg = mapa.get(cat);
+    if (!reg) { reg = { valores: datas.map(() => 0), itens: [] }; mapa.set(cat, reg); }
+    return reg;
+  };
+  for (const p of planos) if (!porPlanoCat.has(p.id)) porPlanoCat.set(p.id, new Map());
+  for (const [cat, planoId] of Object.entries(categorias)) garantirCat(planoId, cat);
+  const ultimoDia = datas.at(-1) ?? '';
   for (const item of itens) {
-    if (item.data < de || item.data > (datas.at(-1) ?? '') || ehTransferenciaFinanceira(item.categoria)) continue;
+    if (item.data < de || item.data > ultimoDia || ehTransferenciaFinanceira(item.categoria)) continue;
     const i = indice.get(granularidade === 'mensal' ? item.data.slice(0,7) : item.data);
     if (i === undefined) continue;
     const id = categorias[item.categoria] ?? '_semplano';
-    const v = valores.get(id) ?? datas.map(() => 0);
-    v[i] = (v[i] ?? 0) + Math.round(item.valor * 100) * (item.tipo === 'pagar' ? -1 : 1);
-    valores.set(id,v);
+    const cat = item.categoria.trim() || 'Sem categoria';
+    const reg = garantirCat(id, cat);
+    reg.valores[i] = (reg.valores[i] ?? 0) + Math.round(item.valor * 100) * (item.tipo === 'pagar' ? -1 : 1);
+    reg.itens.push(item);
   }
-  const linha = (id:string, nome:string, v:number[], filhos: LinhaPatrimonio[] = []): LinhaPatrimonio => {
+  const somar = (lista: LinhaPatrimonio[]) => datas.map((_, i) => lista.reduce((s, f) => s + Math.round((f.valores[i] ?? 0) * 100), 0));
+  const linha = (id:string, nome:string, nivel: LinhaPatrimonio['nivel'], v:number[], filhos: LinhaPatrimonio[] = [], listaItens?: ItemPatrimonio[]): LinhaPatrimonio => {
     const primeiro = v[0] ?? 0, ultimo = v.at(-1) ?? 0;
-    return { id, nome, valores:v.map(n => n/100), variacao:(ultimo-primeiro)/100, percentual:primeiro === 0 ? null : (ultimo-primeiro)/Math.abs(primeiro)*100, total:v.reduce((s,n)=>s+n,0)/100, filhos };
+    return { id, nome, nivel, valores:v.map(n => n/100), variacao:(ultimo-primeiro)/100, percentual:primeiro === 0 ? null : (ultimo-primeiro)/Math.abs(primeiro)*100, total:v.reduce((s,n)=>s+n,0)/100, filhos, ...(listaItens ? { itens: listaItens } : {}) };
   };
   const usados = new Set<string>();
   const montar = (id:string, nome:string, ids:string[]) => {
-    const filhos = ids.filter(p => !usados.has(p)).map(p => { usados.add(p); return linha(p, planos.find(x=>x.id===p)?.nome ?? 'Sem plano financeiro', valores.get(p) ?? datas.map(()=>0)); });
-    return linha(id,nome,datas.map((_,i)=>filhos.reduce((s,f)=>s+Math.round((f.valores[i]??0)*100),0)),filhos);
+    const porNome = new Map<string, { chave: string; nome: string; cats: Map<string, { valores: number[]; itens: ItemPatrimonio[] }> }>();
+    for (const p of ids) {
+      if (usados.has(p)) continue;
+      usados.add(p);
+      const nomePlano = (planos.find(x => x.id === p)?.nome ?? 'Sem plano financeiro').trim();
+      const chave = nomePlano.toLocaleLowerCase('pt-BR');
+      let bloco = porNome.get(chave);
+      if (!bloco) { bloco = { chave: `${id}::${chave}`, nome: nomePlano, cats: new Map() }; porNome.set(chave, bloco); }
+      for (const [cat, reg] of porPlanoCat.get(p) ?? []) {
+        let atual = bloco.cats.get(cat);
+        if (!atual) { atual = { valores: datas.map(() => 0), itens: [] }; bloco.cats.set(cat, atual); }
+        for (let i = 0; i < datas.length; i++) atual.valores[i] = (atual.valores[i] ?? 0) + (reg.valores[i] ?? 0);
+        atual.itens.push(...reg.itens);
+      }
+    }
+    const filhos = [...porNome.values()].map(b => {
+      const cats = [...b.cats.entries()].sort((a, c) => a[0].localeCompare(c[0], 'pt-BR')).map(([cat, reg]) =>
+        linha(`${b.chave}::${cat}`, cat, 'categoria', reg.valores, [], [...reg.itens].sort((a, c) => a.data.localeCompare(c.data)))
+      );
+      return linha(b.chave, b.nome, 'plano', somar(cats), cats);
+    });
+    return linha(id, nome, 'grupo', somar(filhos), filhos);
   };
   const linhas = grupos.map(g => montar(g.id,g.nome,g.planos));
-  const restantes = [...valores.keys()].filter(p => !usados.has(p));
+  const restantes = [...porPlanoCat.keys()].filter(p => !usados.has(p));
   if (restantes.length) linhas.push(montar('_semgrupo','Sem grupo patrimonial',restantes));
-  const total = linha('_resultado','Resultado do período',datas.map((_,i)=>linhas.reduce((s,l)=>s+Math.round((l.valores[i]??0)*100),0)));
+  const total = linha('_resultado','Resultado do período','total',somar(linhas));
   return {linhas,total};
 }
