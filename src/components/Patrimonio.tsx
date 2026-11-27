@@ -64,7 +64,7 @@ function nomeCenario(id: CenarioPatrimonio) {
   return CENARIOS.find((c) => c.id === id)?.nome ?? id;
 }
 
-export function Patrimonio({ lista, realizados, previsoes, versao = 0 }: { lista: Extrato[]; realizados: Realizado[]; previsoes: TituloPatrimonio[]; versao?: number }) {
+export function PatrimonioDetalhado({ lista, realizados, previsoes, versao = 0 }: { lista: Extrato[]; realizados: Realizado[]; previsoes: TituloPatrimonio[]; versao?: number }) {
   const hoje = new Date().toISOString().slice(0, 10);
   const [granularidade, setGranularidade] = useState<GranularidadePatrimonio>("diaria");
   const [de, setDe] = useState(() => somarDias(hoje, -30));

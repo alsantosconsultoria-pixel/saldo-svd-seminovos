@@ -141,6 +141,13 @@
       "when": 1795723760058,
       "tag": "0019_equipe_sobrepor_previsoes_realizados",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795778942255,
+      "tag": "0020_patrimonio_agrupamentos",
+      "breakpoints": true
     }
   ]
 }

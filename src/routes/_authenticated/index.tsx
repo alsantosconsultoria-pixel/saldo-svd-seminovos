@@ -21,7 +21,8 @@ import { SaldoDiario } from "@/components/SaldoDiario";
 import { TabelaLancamentos } from "@/components/TabelaLancamentos";
 import { Tratativas } from "@/components/Tratativas";
 import { Previsoes } from "@/components/Previsoes";
-import { Patrimonio } from "@/components/Patrimonio";
+import { PatrimonioResumo as Patrimonio } from "@/components/PatrimonioResumo";
+import { AdminPatrimonio } from "@/components/AdminPatrimonio";
 import { RelatorioPainel } from "@/components/RelatorioPainel";
 import { ResumoPlano } from "@/components/ResumoPlano";
 import { aplicarProgramacao, ehTransferenciaFinanceira, type MovimentacaoFluxo, type Programacao, fluxoPorPlano, idLinhaPlano, itensForecast, totaisPorPlano, type ContaPlano } from "@/lib/plano";
@@ -400,7 +401,7 @@ function Index() {
           </div>
 
           <TabsContent value="tratativas"><Tratativas key={versaoDados} lista={lista} /></TabsContent>
-          {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminPermissoes /><AdminPlano /><AdminDados /></TabsContent>}
+          {admin && <TabsContent value="admin" className="space-y-4"><AdminUsuarios /><AdminPermissoes /><AdminPlano /><AdminPatrimonio /><AdminDados /></TabsContent>}
           <TabsContent value="previsoes"><Previsoes lista={lista} atualizacao={atualizacaoPrevisoes} realizados={realizados} /></TabsContent>
           <TabsContent value="patrimonio"><Patrimonio lista={ativos} realizados={realizados} previsoes={prevs} versao={versaoDados} /></TabsContent>
 

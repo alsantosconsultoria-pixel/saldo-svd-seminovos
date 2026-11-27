@@ -77,6 +77,21 @@ export type Database = {
         }
         Relationships: []
       }
+      patrimonio_agrupamentos: {
+        Row: {
+          grupos: Json
+          id: string
+        }
+        Insert: {
+          grupos?: Json
+          id?: string
+        }
+        Update: {
+          grupos?: Json
+          id?: string
+        }
+        Relationships: []
+      }
       patrimonio_config: {
         Row: {
           atualizado_em: string

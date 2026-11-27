@@ -51,6 +51,7 @@
 - [x] Conferir na tela com conta conectada: contagens por grupo, botões habilitados e trava do "Apagar tudo".
 
 # Análise de Patrimônio
+- [x] Simplificar a leitura com matriz diária/mensal, agrupamentos manuais exclusivos na Administração e variação do período; 13 testes aprovados e associação persistida conferida com conta conectada, sem excesso horizontal no celular.
 - [x] Criar aba com visões diária e mensal, filtros e comparação entre cenários e períodos.
 - [x] Calcular posição gerencial com dados reais de extratos, realizado e previsões, sem inventar saldos contábeis ausentes.
 - [x] Adicionar premissas interativas, alertas de oscilação, indicadores, gráfico e parecer técnico.
